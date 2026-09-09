@@ -10,8 +10,7 @@ const today = iso(new Date());
 const D = {
   currentUserId: "u1",
   users: [
-    {id:"u1",name:"Sai Prashant",email:"sai@example.com",employeeId:"EMP001",designation:"Solution Architect",practice:"Data & AI",manager:"Manager Name",location:"India",joiningDate:"2021-04-12",profileUrl:"",bio:"Work activity tracker administrator.",role:"Admin",active:true},
-    {id:"u2",name:"Team User",email:"user@example.com",employeeId:"EMP002",designation:"Consultant",practice:"Data & AI",manager:"Manager Name",location:"India",joiningDate:"2023-07-03",profileUrl:"",bio:"",role:"User",active:true}
+    {id:"u1",name:"Sai Prashant",email:"sai@example.com",employeeId:"EMP001",designation:"Solution Architect",practice:"Data & AI",manager:"Manager Name",location:"India",joiningDate:"2021-04-12",profileUrl:"",bio:"Work activity tracker administrator.",role:"Admin",active:true,password:"demo123"}
   ],
   projects: [
     {id:"p1",name:"Regions Bank",client:"Regions Bank",url:"https://example.com/regions",dealStatus:"Ongoing",projectStatus:"Active",pillars:["Proposal & RFP Excellence","Sales Enablement & GTM Support"],startDate:"2026-01-05",targetEndDate:"2026-09-30",notes:"Data and AI proposal work.",createdBy:"u1"},
@@ -97,10 +96,10 @@ const D = {
   ]
 };
 
+const SESSION_KEY = "wat_session_v1";
 const S = {
   page:"dashboard",
   projectId:null,
-  authMode:"login",
   authenticated:false,
   search:"",
   filters:{project:"",category:"",status:"",from:"",to:""},
@@ -168,26 +167,18 @@ function renderAuth(){
   el("app").innerHTML=`
     <div class="login-shell">
       <div class="login-card">
+        <div class="login-brand-mark">WAT</div>
         <div class="login-brand">WORK ACTIVITY TRACKER</div>
-        <div class="login-sub">Capture projects, versions and work activities in one place.</div>
-        <h1 class="login-title">${S.authMode==="login"?"Welcome back":"Create your account"}</h1>
-        <div class="login-help">${S.authMode==="login"?"Sign in to continue.":"Request access by creating your profile."}</div>
+        <div class="login-sub">A structured workspace for projects, versions and work activities.</div>
+        <div class="login-divider"></div>
+        <h1 class="login-title">Sign in</h1>
+        <div class="login-help">Use the credentials provided by your administrator.</div>
         <form class="login-form" onsubmit="submitAuth(event)">
-          ${S.authMode==="signup"?`
-            <div class="field"><label>Full Name</label><input id="authName" required placeholder="Your name"></div>
-          `:""}
-          <div class="field"><label>Email</label><input id="authEmail" type="email" required placeholder="name@company.com"></div>
-          ${S.authMode==="signup"?`
-            <div class="field"><label>Designation</label><input id="authDesignation" required placeholder="Designation"></div>
-          `:""}
-          <div class="field"><label>Password</label><input id="authPassword" type="password" required placeholder="Password"></div>
-          <button class="btn btn-primary" type="submit">${S.authMode==="login"?"Sign in":"Create account"}</button>
+          <div class="field"><label>Email</label><input id="authEmail" type="email" autocomplete="username" required placeholder="name@company.com"></div>
+          <div class="field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
+          <button class="btn btn-primary login-submit" type="submit">Sign in <span>→</span></button>
         </form>
-        <div class="login-footer">
-          ${S.authMode==="login"?
-            `Don't have an account? <button class="link-btn" onclick="S.authMode='signup';render()">Sign up</button>`:
-            `Already have an account? <button class="link-btn" onclick="S.authMode='login';render()">Sign in</button>`}
-        </div>
+        <div class="login-security"><span class="security-dot"></span> Access is managed by an administrator.</div>
       </div>
     </div>`;
 }
@@ -195,19 +186,26 @@ function submitAuth(e){
   e.preventDefault();
   const email=el("authEmail").value.trim().toLowerCase();
   const password=el("authPassword").value;
-  if(S.authMode==="login"){
-    const u=D.users.find(x=>x.email.toLowerCase()===email);
-    if(!u || password!=="demo123"){toast("Invalid email or password","error");return}
-    if(!u.active){toast("This account is inactive. Contact an administrator.","error");return}
-    D.currentUserId=u.id; S.authenticated=true; S.page="dashboard"; render(); toast("Signed in successfully","success");
-  }else{
-    const name=el("authName").value.trim();
-    const designation=el("authDesignation").value.trim();
-    if(D.users.some(x=>x.email.toLowerCase()===email)){toast("An account with this email already exists.","error");return}
-    const u={id:uid("u"),name,email,employeeId:"",designation,practice:"",manager:"",location:"",joiningDate:"",profileUrl:"",bio:"",role:"User",active:true};
-    D.users.push(u); D.currentUserId=u.id; S.authenticated=true; S.page="dashboard"; render();
-    toast("Account created as User","success");
+  const u=D.users.find(x=>x.email.toLowerCase()===email);
+  if(!u || password!==u.password){toast("Invalid email or password","error");return}
+  if(!u.active){toast("This account is inactive. Contact an administrator.","error");return}
+  D.currentUserId=u.id;
+  S.authenticated=true;
+  S.page="dashboard";
+  localStorage.setItem(SESSION_KEY,u.id);
+  render();
+  toast("Signed in successfully","success");
+}
+function restoreSession(){
+  const id=localStorage.getItem(SESSION_KEY);
+  const u=id && D.users.find(x=>x.id===id);
+  if(u && u.active){
+    D.currentUserId=u.id;
+    S.authenticated=true;
+    return true;
   }
+  localStorage.removeItem(SESSION_KEY);
+  return false;
 }
 function renderApp(){
   const u=currentUser();
@@ -255,7 +253,7 @@ function go(page){
   S.page=page; S.projectId=null; closeModal(); render(); window.scrollTo(0,0);
 }
 function toggleSidebar(){el("sidebar")?.classList.toggle("open")}
-function logout(){S.authenticated=false;S.authMode="login";render();toast("Signed out","success")}
+function logout(){localStorage.removeItem("wat_session");S.authenticated=false;S.authMode="login";render();toast("Signed out","success")}
 
 function renderPage(){
   switch(S.page){
@@ -623,11 +621,10 @@ function deleteMaster(type,id){
 function openUser(id=""){
   if(!isAdmin() && id!==currentUser().id){toast("Only administrators can manage users.","error");return}
   const u=D.users.find(x=>x.id===id)||{};
-  const self=id===currentUser().id;
   openModal(id?"Edit User":"Add User",`
     <form onsubmit="saveUser(event,'${id}')"><div class="form-grid">
       <div class="field"><label>Name</label><input id="ufName" required value="${escapeHtml(u.name||"")}"></div>
-      <div class="field"><label>Email</label><input id="ufEmail" type="email" required value="${escapeHtml(u.email||"")}" ${id?"":" "}></div>
+      <div class="field"><label>Email</label><input id="ufEmail" type="email" required value="${escapeHtml(u.email||"")}"></div>
       <div class="field"><label>Employee ID</label><input id="ufEmp" value="${escapeHtml(u.employeeId||"")}"></div>
       <div class="field"><label>Designation</label><input id="ufDesignation" required value="${escapeHtml(u.designation||"")}"></div>
       <div class="field"><label>Practice / Business Unit</label><input id="ufPractice" value="${escapeHtml(u.practice||"")}"></div>
@@ -635,18 +632,44 @@ function openUser(id=""){
       <div class="field"><label>Location</label><input id="ufLocation" value="${escapeHtml(u.location||"")}"></div>
       <div class="field"><label>Joining Date</label><input id="ufJoining" type="date" value="${u.joiningDate||""}"></div>
       <div class="field"><label>Profile URL</label><input id="ufUrl" type="url" value="${escapeHtml(u.profileUrl||"")}" placeholder="https://..."></div>
-      ${isAdmin()?`<div class="field"><label>Role</label><select id="ufRole"><option ${u.role==="User"?"selected":""}>User</option><option ${u.role==="Admin"?"selected":""}>Admin</option></select></div><div class="field"><label>Access</label><div class="toggle-wrap" style="margin-top:4px"><button type="button" id="ufActive" class="toggle ${u.active!==false?"on":""}" onclick="this.classList.toggle('on')"><span></span></button><span id="ufActiveLabel" class="toggle-label ${u.active!==false?"on":""}">${u.active!==false?"Active":"Inactive"}</span></div></div>`:""}
+      <div class="field"><label>Role</label><select id="ufRole"><option ${u.role==="User"?"selected":""}>User</option><option ${u.role==="Admin"?"selected":""}>Admin</option></select></div>
+      <div class="field"><label>${id?"Password":"Initial Password"}</label><input id="ufPassword" type="password" ${id?"":"required"} value="${escapeHtml(id?"":u.password||"")}" placeholder="${id?"Leave blank to keep current password":"Set a temporary password"}"></div>
+      <div class="field"><label>Access</label><div class="toggle-wrap" style="margin-top:4px"><button type="button" id="ufActive" class="toggle ${u.active!==false?"on":""}" onclick="this.classList.toggle('on')"><span></span></button><span id="ufActiveLabel" class="toggle-label ${u.active!==false?"on":""}">${u.active!==false?"Active":"Inactive"}</span></div></div>
       <div class="field span-2"><label>Bio</label><textarea id="ufBio">${escapeHtml(u.bio||"")}</textarea></div>
-    </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${id?"Save Changes":"Add User"}</button></div></form>`);
+    </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${id?"Save Changes":"Create User"}</button></div></form>`);
   el("ufActive")?.addEventListener("click",()=>{const on=el("ufActive").classList.contains("on");el("ufActiveLabel").textContent=on?"Active":"Inactive";el("ufActiveLabel").className=`toggle-label ${on?"on":""}`});
 }
 function saveUser(e,id){
   e.preventDefault();
   const email=el("ufEmail").value.trim().toLowerCase();
   if(D.users.some(u=>u.email.toLowerCase()===email && u.id!==id)){toast("Another user already uses this email.","error");return}
-  const obj={name:el("ufName").value.trim(),email,employeeId:el("ufEmp").value.trim(),designation:el("ufDesignation").value.trim(),practice:el("ufPractice").value.trim(),manager:el("ufManager").value.trim(),location:el("ufLocation").value.trim(),joiningDate:el("ufJoining").value,profileUrl:el("ufUrl").value.trim(),bio:el("ufBio").value.trim()};
-  if(isAdmin()){obj.role=el("ufRole")?.value||"User";obj.active=el("ufActive")?.classList.contains("on")??true}
-  if(id){Object.assign(D.users.find(u=>u.id===id),obj);toast("Profile updated","success")}else{D.users.push({id:uid("u"),...obj,role:"User",active:true});toast("User added","success")}
+  const password=el("ufPassword").value;
+  const existing=D.users.find(u=>u.id===id);
+  if(!id && !password){toast("An initial password is required.","error");return}
+  const obj={
+    name:el("ufName").value.trim(),email,employeeId:el("ufEmp").value.trim(),
+    designation:el("ufDesignation").value.trim(),practice:el("ufPractice").value.trim(),
+    manager:el("ufManager").value.trim(),location:el("ufLocation").value.trim(),
+    joiningDate:el("ufJoining").value,profileUrl:el("ufUrl").value.trim(),bio:el("ufBio").value.trim(),
+    role:el("ufRole").value,active:el("ufActive").classList.contains("on")
+  };
+  if(password)obj.password=password;
+  if(id){
+    Object.assign(existing,obj);
+    if(existing.id===currentUser().id && !existing.active){
+      localStorage.removeItem(SESSION_KEY);
+      S.authenticated=false;
+      closeModal();render();toast("Your access has been deactivated.","error");return;
+    }
+    if(existing.id===currentUser().id && existing.role!=="Admin"){
+      // Keep current UI permissions aligned after a role change.
+      S.page="dashboard";
+    }
+    toast("User profile updated","success");
+  }else{
+    D.users.push({id:uid("u"),...obj});
+    toast("User created. Share the login details securely with the user.","success");
+  }
   closeModal();refreshPage();
 }
 
@@ -665,4 +688,22 @@ function exportCsv(){
   a.href=url;a.download="work-activity-report.csv";a.click();URL.revokeObjectURL(url);
 }
 
+function restoreSession(){
+  try{
+    const saved=JSON.parse(localStorage.getItem("wat_session")||"null");
+    if(saved?.signedIn && saved.userId){
+      const u=D.users.find(x=>x.id===saved.userId);
+      if(u && u.active){
+        D.currentUserId=u.id;
+        S.authenticated=true;
+      }else{
+        localStorage.removeItem("wat_session");
+      }
+    }
+  }catch(e){
+    localStorage.removeItem("wat_session");
+  }
+}
+
+restoreSession();
 render();
