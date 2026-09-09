@@ -1,10 +1,14 @@
-/* Work Activity Tracker V2.4
-   Supabase-backed, no-login frontend.
-   UI is based on V2.3; persistent data lives in Supabase.
+/* Work Activity Tracker V2.5
+   Supabase-backed, authenticated frontend.
+   UI is based on V2.4; persistent data lives in Supabase.
 */
 const SUPABASE_URL = "https://uwmsnhglfxntkubfhfyc.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_RE4qab_OkBeBS71zlXr3Gw_rjuVD82-";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+const SUPABASE_AUTH_URL = `${SUPABASE_URL}/auth/v1`;
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+let authSession = null;
+let authUser = null;
 
 const iso = (d) => new Date(d).toISOString().slice(0,10);
 const today = iso(new Date());
@@ -56,7 +60,8 @@ const tableMap={
 const masterTableMap={category:"activity_categories",pillar:"pillars",dealStatus:"deal_statuses",projectStatus:"project_statuses",versionStatus:"version_statuses"};
 
 function sbHeaders(extra={}){
-  return {"apikey":SUPABASE_PUBLISHABLE_KEY,"Authorization":`Bearer ${SUPABASE_PUBLISHABLE_KEY}`,"Content-Type":"application/json",...extra};
+  const token=authSession?.access_token||SUPABASE_PUBLISHABLE_KEY;
+  return {"apikey":SUPABASE_PUBLISHABLE_KEY,"Authorization":`Bearer ${token}`,"Content-Type":"application/json",...extra};
 }
 async function sbFetch(path,options={}){
   const response=await fetch(`${SUPABASE_REST_URL}/${path}`,{...options,headers:sbHeaders(options.headers||{})});
@@ -83,7 +88,7 @@ async function fetchTable(table,query="select=*"){
 }
 async function bootstrapData(){
   const [profiles,projects,versions,activities,categories,pillars,dealStatuses,projectStatuses,versionStatuses,projectPillars]=await Promise.all([
-    fetchTable(tableMap.users,"select=id,name,email,employee_id,designation,practice_business_unit,manager,location,joining_date,profile_url,bio,role,active&order=name.asc"),
+    fetchTable(tableMap.users,`select=id,name,email,employee_id,designation,practice_business_unit,manager,location,joining_date,profile_url,bio,role,active&id=eq.${encodeURIComponent(authUser.id)}`),
     fetchTable(tableMap.projects,"select=*&order=name.asc"),
     fetchTable(tableMap.versions,"select=*&order=created_date.asc"),
     fetchTable(tableMap.activities,"select=*&order=activity_date.desc"),
@@ -110,8 +115,8 @@ async function bootstrapData(){
 
 function projectPayload(data){return {name:data["Project Name"],client_account:data["Client / Account"],project_url:data["Project URL"]||null,deal_status_id:data["Deal Status ID"]||null,project_status_id:data["Project Status ID"]||null,start_date:data["Start Date"]||null,target_end_date:data["Target End Date"]||null,notes:data.Notes||null};}
 function versionPayload(data){return {project_id:data["Project ID"],version_number:data["Version Number"],version_name:data["Version Name"],reason:data.Reason||null,version_status_id:data["Version Status ID"]||null,version_url:data["Version URL"]||null,created_date:data["Created Date"]||null,notes:data.Notes||null};}
-function activityPayload(data){return {project_id:data["Project ID"],version_id:data["Version ID"]||null,activity_date:data["Activity Date"],category_id:data["Category ID"],activity_title:data["Activity Title"],details_outcome:data["Details / Outcome"],activity_status:data["Activity Status"],hours:Number(data.Hours||0),url:data.URL||null,tags:data.Tags||null};}
-function profilePayload(data){return {name:data.Name,email:data.Email,employee_id:data["Employee ID"]||null,designation:data.Designation||null,practice_business_unit:data["Practice / Business Unit"]||null,manager:data.Manager||null,location:data.Location||null,joining_date:data["Joining Date"]||null,profile_url:data["Profile URL"]||null,bio:data.Bio||null,role:data.Role||"User",active:data.Active!==false};}
+function activityPayload(data){return {project_id:data["Project ID"],version_id:data["Version ID"]||null,activity_date:data["Activity Date"],category_id:data["Category ID"],activity_title:data["Activity Title"],details_outcome:data["Details / Outcome"],activity_status:data["Activity Status"],hours:Number(data.Hours||0),url:data.URL||null,tags:data.Tags||null,user_id:authUser.id};}
+function profilePayload(data){return {id:authUser.id,name:data.Name,email:data.Email,employee_id:data["Employee ID"]||null,designation:data.Designation||null,practice_business_unit:data["Practice / Business Unit"]||null,manager:data.Manager||null,location:data.Location||null,joining_date:data["Joining Date"]||null,profile_url:data["Profile URL"]||null,bio:data.Bio||null,role:data.Role||"User",active:data.Active!==false};}
 
 async function replaceProjectPillars(projectId,pillarNames=[]){
   await sbFetch(`project_pillars?project_id=eq.${encodeURIComponent(projectId)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}});
@@ -126,7 +131,7 @@ async function apiRequest(action,payload={}){
     const table=tableMap[entity]||entity;
     if(entity==="projects"){
       if(action==="create"){
-        const rows=await sbFetch("projects",{method:"POST",headers:{"Prefer":"return=representation"},body:JSON.stringify(projectPayload(data))});
+        const rows=await sbFetch("projects",{method:"POST",headers:{"Prefer":"return=representation"},body:JSON.stringify({...projectPayload(data),created_by:authUser.id})});
         const row=rows?.[0]; if(!row)throw new Error("Project was not created.");
         await replaceProjectPillars(row.id,data.Pillars?splitPillars(data.Pillars):[]); return row;
       }
@@ -190,7 +195,7 @@ const S = {page:"dashboard",projectId:null,search:"",filters:{project:"",categor
 
 
 const el = (id) => document.getElementById(id);
-const currentUser = () => D.users.find(u=>u.id===D.currentUserId) || {id:"",name:"Workspace",email:"",designation:"",practice:"",manager:"",location:"",joiningDate:"",profileUrl:"",bio:"",role:"User",active:true};
+const currentUser = () => D.users.find(u=>u.id===D.currentUserId) || {id:authUser?.id||"",name:authUser?.email?.split("@")[0]||"Workspace",email:authUser?.email||"",designation:"",practice:"",manager:"",location:"",joiningDate:"",profileUrl:"",bio:"",role:"User",active:true};
 const isAdmin = () => true;
 const initials = (name="") => name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
 const escapeHtml = (v="") => String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
@@ -257,8 +262,8 @@ function renderApp(){
           ${navBtn("profile","Profile","profile")}
         </nav>
         <div class="sidebar-bottom">
-          <div class="user-mini"><div class="avatar">${initials(u.name||"WAT")}</div><div><div class="user-mini-name">${escapeHtml(u.name||"Workspace")}</div><div class="user-mini-role">No login required</div></div></div>
-          <div class="note" style="font-size:10px;padding:8px 9px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#b9c7d9">Connected to Supabase</div>
+          <div class="user-mini"><div class="avatar">${initials(u.name||"WAT")}</div><div><div class="user-mini-name">${escapeHtml(u.name||"Workspace")}</div><div class="user-mini-role">Signed in</div></div></div>
+          <button class="logout-btn" onclick="logout()">${icon("logout")} Sign out</button><div class="note" style="font-size:10px;padding:8px 9px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#b9c7d9">Authenticated via Supabase</div>
         </div>
       </aside>
       <main class="main">
@@ -454,10 +459,10 @@ function masterCard(title,list,type,label){
 
 function pageProfile(){
   const u=currentUser();
-  return `${pageHead("Profile","Optional profile information. The tracker does not require login or user authentication.")}
+  return `${pageHead("Profile","Your appraisal and professional profile information.")}
     <section class="card profile-card">
       <div class="profile-header"><div class="profile-avatar">${initials(u.name||"Workspace")}</div><div><div class="profile-name">${escapeHtml(u.name||"Workspace")}</div><div class="profile-role">${escapeHtml(u.designation||"Workspace profile")}</div></div></div>
-      <div class="note">No-login mode is enabled. Work records are shared through the Supabase database. A profile is optional and does not control access.</div>
+      <div class="note">Your account identity is managed by Supabase Authentication. This profile stores only the professional information used by the tracker.</div>
       <div class="form-grid" style="margin-top:18px">${profileInfo("Name",u.name||"—")}${profileInfo("Email",u.email||"—")}${profileInfo("Employee ID",u.employeeId||"—")}${profileInfo("Designation",u.designation||"—")}${profileInfo("Practice / Business Unit",u.practice||"—")}${profileInfo("Manager",u.manager||"—")}</div>
       <div class="actions" style="margin-top:18px"><button class="btn btn-primary" onclick="openUser('${u.id||""}')">${icon("edit")} ${u.id?"Edit Profile":"Create Profile"}</button></div>
     </section>`;
@@ -736,13 +741,40 @@ function exportCsv(){
   a.href=url;a.download="work-activity-report.csv";a.click();URL.revokeObjectURL(url);
 }
 
+function showLogin(message=""){
+  el("app").innerHTML=`<div class="login-shell"><div class="login-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Secure access to your personal work and appraisal tracker.</div><div class="login-divider"></div><h1 class="login-title">Sign in</h1><div class="login-help">Use your Supabase account credentials.</div>${message?`<div class="note" style="margin-bottom:16px;border-color:#efc5c9;background:#fff0f1;color:#9f2933">${escapeHtml(message)}</div>`:""}<form class="login-form" onsubmit="submitLogin(event)"><div class="field"><label>Email</label><input id="loginEmail" type="email" autocomplete="username" required></div><div class="field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required></div><button class="btn btn-primary login-submit" type="submit">Sign in <span>→</span></button></form><div class="login-security">Authentication handled by Supabase Auth</div></div></div>`;
+}
+async function submitLogin(e){
+  e.preventDefault();
+  const btn=e.submitter; if(btn){btn.disabled=true;btn.textContent="Signing in…";}
+  try{
+    const {data,error}=await supabaseClient.auth.signInWithPassword({email:el("loginEmail").value.trim(),password:el("loginPassword").value});
+    if(error)throw error;
+    authSession=data.session;authUser=data.user;
+    await loadBackendData();S.loading=false;render();
+  }catch(err){showLogin(err.message||"Unable to sign in.");}
+  finally{if(btn)btn.disabled=false;}
+}
+async function logout(){
+  try{await supabaseClient.auth.signOut();}catch(_){}
+  authSession=null;authUser=null;D.currentUserId="";D.users=[];S.page="dashboard";S.projectId=null;showLogin("You have been signed out.");
+}
 async function init(){
-  el("app").innerHTML=`<div class="startup-shell"><div class="startup-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Connecting to Supabase…</div></div></div>`;
-  try{await loadBackendData();S.loading=false;render();}
-  catch(err){
+  el("app").innerHTML=`<div class="startup-shell"><div class="startup-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Checking secure session…</div></div></div>`;
+  try{
+    const {data,error}=await supabaseClient.auth.getSession();
+    if(error)throw error;
+    authSession=data.session;authUser=data.session?.user||null;
+    if(!authSession||!authUser){S.loading=false;showLogin();return;}
+    await loadBackendData();S.loading=false;render();
+  }catch(err){
     S.loading=false;
-    el("app").innerHTML=`<div class="startup-shell"><div class="startup-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Unable to connect to Supabase.</div><div class="note" style="margin-top:16px">${escapeHtml(err.message||String(err))}</div><button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="init()">Retry</button></div></div>`;
+    el("app").innerHTML=`<div class="startup-shell"><div class="startup-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Unable to initialize secure access.</div><div class="note" style="margin-top:16px">${escapeHtml(err.message||String(err))}</div><button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="init()">Retry</button></div></div>`;
   }
 }
+supabaseClient.auth.onAuthStateChange((event,session)=>{
+  authSession=session;authUser=session?.user||null;
+  if(event==="SIGNED_OUT")showLogin();
+});
 init();
 
