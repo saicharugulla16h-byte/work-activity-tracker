@@ -3,8 +3,6 @@
    Frontend prototype only. Data is intentionally in-memory.
    Authentication below is demo-only and will be replaced by Google Apps Script.
 */
-const DEMO_PASSWORD = "demo123";
-
 const uid = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
 const iso = (d) => new Date(d).toISOString().slice(0,10);
 const today = iso(new Date());
@@ -13,7 +11,7 @@ const D = {
   currentUserId: "u1",
   users: [
     {id:"u1",name:"Sai Prashant",email:"sai@example.com",employeeId:"EMP001",designation:"Solution Architect",practice:"Data & AI",manager:"Manager Name",location:"India",joiningDate:"2021-04-12",profileUrl:"",bio:"Work activity tracker administrator.",role:"Admin",active:true},
-    {id:"u2",name:"Demo User",email:"user@example.com",employeeId:"EMP002",designation:"Consultant",practice:"Data & AI",manager:"Manager Name",location:"India",joiningDate:"2023-07-03",profileUrl:"",bio:"Demo user account.",role:"User",active:true}
+    {id:"u2",name:"Team User",email:"user@example.com",employeeId:"EMP002",designation:"Consultant",practice:"Data & AI",manager:"Manager Name",location:"India",joiningDate:"2023-07-03",profileUrl:"",bio:"",role:"User",active:true}
   ],
   projects: [
     {id:"p1",name:"Regions Bank",client:"Regions Bank",url:"https://example.com/regions",dealStatus:"Ongoing",projectStatus:"Active",pillars:["Proposal & RFP Excellence","Sales Enablement & GTM Support"],startDate:"2026-01-05",targetEndDate:"2026-09-30",notes:"Data and AI proposal work.",createdBy:"u1"},
@@ -190,9 +188,6 @@ function renderAuth(){
             `Don't have an account? <button class="link-btn" onclick="S.authMode='signup';render()">Sign up</button>`:
             `Already have an account? <button class="link-btn" onclick="S.authMode='login';render()">Sign in</button>`}
         </div>
-        <div class="demo-note">
-          <strong>Prototype login:</strong> use <b>sai@example.com</b> or <b>user@example.com</b> with password <b>${DEMO_PASSWORD}</b>. Real authentication will be connected to the backend later.
-        </div>
       </div>
     </div>`;
 }
@@ -202,7 +197,7 @@ function submitAuth(e){
   const password=el("authPassword").value;
   if(S.authMode==="login"){
     const u=D.users.find(x=>x.email.toLowerCase()===email);
-    if(!u || password!==DEMO_PASSWORD){toast("Invalid email or password","error");return}
+    if(!u || password!=="demo123"){toast("Invalid email or password","error");return}
     if(!u.active){toast("This account is inactive. Contact an administrator.","error");return}
     D.currentUserId=u.id; S.authenticated=true; S.page="dashboard"; render(); toast("Signed in successfully","success");
   }else{
@@ -380,7 +375,7 @@ function projectCard(p){
     <div class="project-pills">${p.pillars.map(x=>`<span class="badge badge-blue">${escapeHtml(x)}</span>`).join("")}</div>
     <div style="margin-top:10px">${statusBadge(p.dealStatus)}</div>
     <div class="project-stats"><div><div class="stat-value">${versions.length}</div><div class="stat-label">Versions</div></div><div><div class="stat-value">${acts.length}</div><div class="stat-label">Activities</div></div><div><div class="stat-value">${acts.reduce((s,a)=>s+Number(a.hours||0),0).toFixed(1)}</div><div class="stat-label">Hours</div></div></div>
-    <div class="actions" style="margin-top:13px"><button class="btn btn-sm" onclick="openProjectDetail('${p.id}')">${icon("eye")} View</button><button class="btn btn-sm" onclick="openProject('${p.id}')">${icon("edit")} Edit</button></div>
+    <div class="actions" style="margin-top:13px"><button class="btn btn-sm" onclick="openProjectDetail('${p.id}')">${icon("eye")} View</button><button class="btn btn-sm" onclick="openProject('${p.id}')">${icon("edit")} Edit</button><button class="btn btn-sm btn-danger" onclick="deleteProject('${p.id}')">${icon("trash")} Delete</button></div>
   </div>`;
 }
 function openProjectDetail(id){S.projectId=id;S.page="projectDetail";render()}
@@ -525,6 +520,35 @@ function saveProject(e,id){
   const obj={name:el("pfName").value.trim(),client:el("pfClient").value.trim(),dealStatus:el("pfDeal").value,projectStatus:el("pfStatus").value,startDate:el("pfStart").value,targetEndDate:el("pfEnd").value,url:el("pfUrl").value.trim(),pillars,notes:el("pfNotes").value.trim()};
   if(id){Object.assign(projectById(id),obj);toast("Project updated","success")}else{D.projects.push({id:uid("p"),...obj,createdBy:currentUser().id});toast("Project added","success")}
   closeModal();refreshPage();
+}
+
+function deleteProject(id){
+  const p=projectById(id);
+  if(!p)return;
+  const versionCount=D.versions.filter(v=>v.projectId===id).length;
+  const activityCount=D.activities.filter(a=>a.projectId===id).length;
+  openModal("Delete Project",`
+    <div class="note" style="border-color:#f0c7cb;background:#fff5f5;color:#7e3036">
+      <strong>This action is permanent.</strong><br>
+      Deleting <strong>${escapeHtml(p.name)}</strong> will also delete ${versionCount} version${versionCount===1?"":"s"} and ${activityCount} activit${activityCount===1?"y":"ies"} associated with this project.
+    </div>
+    <div style="margin-top:15px;font-size:12px;color:var(--muted)">The project, its versions and its activities will be removed from this prototype.</div>
+    <div class="modal-foot">
+      <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-danger" onclick="confirmDeleteProject('${id}')">${icon("trash")} Delete Project</button>
+    </div>`);
+}
+function confirmDeleteProject(id){
+  const p=projectById(id);
+  if(!p)return;
+  D.activities=D.activities.filter(a=>a.projectId!==id);
+  D.versions=D.versions.filter(v=>v.projectId!==id);
+  D.projects=D.projects.filter(x=>x.id!==id);
+  closeModal();
+  if(S.projectId===id)S.projectId=null;
+  toast(`Project "${p.name}" deleted`,"success");
+  S.page="projects";
+  refreshPage();
 }
 
 function openVersion(id="",projectId=""){
