@@ -96,6 +96,148 @@ const D = {
   ]
 };
 
+
+/* =========================
+   BACKEND API
+   ========================= */
+const API_URL = "https://script.google.com/macros/s/AKfycbyg8D9mD4DjnhbUIq5krJ_0NgODE2QtLpE6FnykmW0f23JcRooAoYCHWQLdH6kWq29c/exec";
+const API_SESSION_KEY = "wat_session_v1";
+
+const backendEntity = {
+  users: "profiles",
+  projects: "projects",
+  versions: "versions",
+  activities: "activities",
+  categories: "activityCategories",
+  pillars: "pillars",
+  dealStatuses: "dealStatuses",
+  projectStatuses: "projectStatuses",
+  versionStatuses: "versionStatuses"
+};
+const masterBackendEntity = {
+  category: "activityCategories",
+  pillar: "pillars",
+  dealStatus: "dealStatuses",
+  projectStatus: "projectStatuses",
+  versionStatus: "versionStatuses"
+};
+
+function dateOnly(v){
+  if(!v) return "";
+  const s=String(v);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m=s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if(m)return m[1];
+  const d=new Date(v);
+  return isNaN(d.getTime()) ? "" : d.toISOString().slice(0,10);
+}
+function boolValue(v){
+  if(v===true)return true;
+  return ["true","1","yes","active"].includes(String(v).trim().toLowerCase());
+}
+function splitPillars(v){
+  if(Array.isArray(v))return v;
+  if(!v)return [];
+  return String(v).split(/\s*[;,]\s*/).map(x=>x.trim()).filter(Boolean);
+}
+function normalizeProfile(r={}){
+  return {id:String(r["Profile ID"]||""),name:String(r.Name||""),email:String(r.Email||""),employeeId:String(r["Employee ID"]||""),designation:String(r.Designation||""),practice:String(r["Practice / Business Unit"]||""),manager:String(r.Manager||""),location:String(r.Location||""),joiningDate:dateOnly(r["Joining Date"]),profileUrl:String(r["Profile URL"]||""),bio:String(r.Bio||""),role:String(r.Role||"User"),active:boolValue(r.Active)};
+}
+function normalizeCategory(r={}){return {id:String(r["Category ID"]||""),name:String(r["Category Name"]||""),description:String(r.Description||""),active:boolValue(r.Active),order:Number(r["Display Order"]||0)};}
+function normalizePillar(r={}){return {id:String(r["Pillar ID"]||""),name:String(r["Pillar Name"]||""),description:String(r.Description||""),active:boolValue(r.Active),order:Number(r["Display Order"]||0)};}
+function normalizeStatus(r,idField){return {id:String(r[idField]||""),name:String(r["Status Name"]||""),active:boolValue(r.Active),order:Number(r["Display Order"]||0)};}
+function normalizeProject(r={}){return {id:String(r["Project ID"]||""),name:String(r["Project Name"]||""),client:String(r["Client / Account"]||""),url:String(r["Project URL"]||""),dealStatusId:String(r["Deal Status ID"]||""),projectStatusId:String(r["Project Status ID"]||""),dealStatus:"",projectStatus:"",startDate:dateOnly(r["Start Date"]),targetEndDate:dateOnly(r["Target End Date"]),notes:String(r.Notes||""),createdBy:String(r["Created By"]||"") ,pillars:splitPillars(r.Pillars)};}
+function normalizeVersion(r={}){return {id:String(r["Version ID"]||""),projectId:String(r["Project ID"]||""),number:String(r["Version Number"]||""),name:String(r["Version Name"]||""),reason:String(r.Reason||""),statusId:String(r["Version Status ID"]||""),status:"",url:String(r["Version URL"]||""),date:dateOnly(r["Created Date"]),notes:String(r.Notes||"")};}
+function normalizeActivity(r={}){return {id:String(r["Activity ID"]||""),projectId:String(r["Project ID"]||""),versionId:String(r["Version ID"]||""),date:dateOnly(r["Activity Date"]),categoryId:String(r["Category ID"]||""),category:"",title:String(r["Activity Title"]||""),details:String(r["Details / Outcome"]||""),status:String(r["Activity Status"]||""),hours:Number(r.Hours||0),url:String(r.URL||""),tags:String(r.Tags||""),userId:String(r["User ID"]||"")};}
+
+function apiRequest(action, payload={}){
+  const body={action,...payload};
+  if(action!=="login" && !body.token){
+    const token=localStorage.getItem(API_SESSION_KEY);
+    if(token)body.token=token;
+  }
+  return fetch(API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(body),
+    redirect:"follow"
+  }).then(async response=>{
+    const text=await response.text();
+    let json;
+    try{json=JSON.parse(text)}catch(_){throw new Error("The backend returned an invalid response.");}
+    if(json.status!=="success")throw new Error(json.message||"Backend request failed.");
+    return json.data;
+  });
+}
+
+function applyBootstrap(data){
+  const categories=(data.activityCategories||[]).map(normalizeCategory);
+  const pillars=(data.pillars||[]).map(normalizePillar);
+  const dealStatuses=(data.dealStatuses||[]).map(r=>normalizeStatus(r,"Deal Status ID"));
+  const projectStatuses=(data.projectStatuses||[]).map(r=>normalizeStatus(r,"Project Status ID"));
+  const versionStatuses=(data.versionStatuses||[]).map(r=>normalizeStatus(r,"Version Status ID"));
+  const projects=(data.projects||[]).map(normalizeProject);
+  const versions=(data.versions||[]).map(normalizeVersion);
+  const activities=(data.activities||[]).map(normalizeActivity);
+  const users=(data.profiles||[]).map(normalizeProfile);
+
+  const dealById=Object.fromEntries(dealStatuses.map(x=>[x.id,x.name]));
+  const projectByStatusId=Object.fromEntries(projectStatuses.map(x=>[x.id,x.name]));
+  const versionByStatusId=Object.fromEntries(versionStatuses.map(x=>[x.id,x.name]));
+  const categoryById=Object.fromEntries(categories.map(x=>[x.id,x.name]));
+
+  projects.forEach(p=>{p.dealStatus=dealById[p.dealStatusId]||"";p.projectStatus=projectByStatusId[p.projectStatusId]||"";});
+  versions.forEach(v=>{v.status=versionByStatusId[v.statusId]||"";});
+  activities.forEach(a=>{a.category=categoryById[a.categoryId]||"";});
+
+  D.users=users;
+  D.projects=projects;
+  D.versions=versions;
+  D.activities=activities;
+  D.categories=categories;
+  D.pillars=pillars;
+  D.dealStatuses=dealStatuses;
+  D.projectStatuses=projectStatuses;
+  D.versionStatuses=versionStatuses;
+
+  const me=normalizeProfile(data.user||{});
+  if(me.id){
+    D.currentUserId=me.id;
+    const exists=D.users.find(u=>u.id===me.id);
+    if(!exists)D.users.push(me);
+  }
+}
+
+async function loadBackendData(){
+  const token=localStorage.getItem(API_SESSION_KEY);
+  if(!token)throw new Error("No active session.");
+  const data=await apiRequest("bootstrap",{token});
+  applyBootstrap(data);
+  S.authenticated=true;
+  return data;
+}
+
+async function syncAfterChange(){
+  try{
+    await loadBackendData();
+    refreshPage();
+  }catch(err){
+    handleApiError(err);
+  }
+}
+
+function handleApiError(err){
+  const msg=String(err?.message||err);
+  if(/session|authentication|invalid|expired|inactive/i.test(msg)){
+    localStorage.removeItem(API_SESSION_KEY);
+    S.authenticated=false;
+    render();
+    toast("Your session has expired. Please sign in again.","error");
+  }else{
+    toast(msg,"error");
+  }
+}
+
 const SESSION_KEY = "wat_session_v1";
 const S = {
   page:"dashboard",
@@ -182,30 +324,40 @@ function renderAuth(){
       </div>
     </div>`;
 }
-function submitAuth(e){
+async function submitAuth(e){
   e.preventDefault();
   const email=el("authEmail").value.trim().toLowerCase();
   const password=el("authPassword").value;
-  const u=D.users.find(x=>x.email.toLowerCase()===email);
-  if(!u || password!==u.password){toast("Invalid email or password","error");return}
-  if(!u.active){toast("This account is inactive. Contact an administrator.","error");return}
-  D.currentUserId=u.id;
-  S.authenticated=true;
-  S.page="dashboard";
-  localStorage.setItem(SESSION_KEY,u.id);
-  render();
-  toast("Signed in successfully","success");
-}
-function restoreSession(){
-  const id=localStorage.getItem(SESSION_KEY);
-  const u=id && D.users.find(x=>x.id===id);
-  if(u && u.active){
-    D.currentUserId=u.id;
+  const button=e.submitter||document.querySelector(".login-submit");
+  if(button){button.disabled=true;button.textContent="Signing in…";}
+  try{
+    const data=await apiRequest("login",{email,password});
+    localStorage.setItem(API_SESSION_KEY,data.token);
+    D.currentUserId=String(data.user["Profile ID"]||"");
     S.authenticated=true;
-    return true;
+    S.page="dashboard";
+    await loadBackendData();
+    render();
+    toast("Signed in successfully","success");
+  }catch(err){
+    toast(err.message||"Unable to sign in.","error");
+    if(button){button.disabled=false;button.textContent="Sign in →";}
   }
-  localStorage.removeItem(SESSION_KEY);
-  return false;
+}
+async function restoreSession(){
+  const token=localStorage.getItem(API_SESSION_KEY);
+  if(!token)return false;
+  try{
+    const data=await apiRequest("me",{token});
+    D.currentUserId=String(data.user["Profile ID"]||"");
+    S.authenticated=true;
+    await loadBackendData();
+    return true;
+  }catch(_){
+    localStorage.removeItem(API_SESSION_KEY);
+    S.authenticated=false;
+    return false;
+  }
 }
 function renderApp(){
   const u=currentUser();
@@ -253,7 +405,14 @@ function go(page){
   S.page=page; S.projectId=null; closeModal(); render(); window.scrollTo(0,0);
 }
 function toggleSidebar(){el("sidebar")?.classList.toggle("open")}
-function logout(){localStorage.removeItem("wat_session");S.authenticated=false;S.authMode="login";render();toast("Signed out","success")}
+async function logout(){
+  const token=localStorage.getItem(API_SESSION_KEY);
+  try{if(token)await apiRequest("logout",{token});}catch(_){}
+  localStorage.removeItem(API_SESSION_KEY);
+  S.authenticated=false;
+  render();
+  toast("Signed out","success");
+}
 
 function renderPage(){
   switch(S.page){
@@ -485,16 +644,38 @@ function populateActivityVersions(){
   const select=el("afVersion"); if(!select)return;
   select.innerHTML='<option value="">No version</option>'+D.versions.filter(v=>v.projectId===project).map(v=>`<option value="${v.id}">${escapeHtml(v.number+" · "+v.name)}</option>`).join("");
 }
-function saveActivity(e,id){
+async function saveActivity(e,id){
   e.preventDefault();
-  const obj={projectId:el("afProject").value,versionId:el("afVersion").value,date:el("afDate").value,category:el("afCategory").value,title:el("afTitle").value.trim(),details:el("afDetails").value.trim(),status:el("afStatus").value,hours:Number(el("afHours").value),url:el("afUrl").value.trim(),tags:el("afTags").value.trim(),userId:currentUser().id};
-  if(!obj.projectId||!obj.category||!obj.title){toast("Please complete the required fields.","error");return}
-  if(id){Object.assign(D.activities.find(a=>a.id===id),obj);toast("Activity updated","success")}else{D.activities.push({id:uid("a"),...obj});toast("Activity added","success")}
-  closeModal();refreshPage();
+  const categoryName=el("afCategory").value;
+  const category=D.categories.find(c=>c.name===categoryName);
+  const obj={
+    "Project ID":el("afProject").value,
+    "Version ID":el("afVersion").value,
+    "Activity Date":el("afDate").value,
+    "Category ID":category?.id||"",
+    "Activity Title":el("afTitle").value.trim(),
+    "Details / Outcome":el("afDetails").value.trim(),
+    "Activity Status":el("afStatus").value,
+    "Hours":Number(el("afHours").value),
+    "URL":el("afUrl").value.trim(),
+    "Tags":el("afTags").value.trim()
+  };
+  if(!obj["Project ID"]||!obj["Category ID"]||!obj["Activity Title"]){toast("Please complete the required fields.","error");return}
+  try{
+    if(id)await apiRequest("update",{entity:"activities",id,data:obj});
+    else await apiRequest("create",{entity:"activities",data:obj});
+    closeModal();
+    await syncAfterChange();
+    toast(id?"Activity updated":"Activity added","success");
+  }catch(err){handleApiError(err)}
 }
-function deleteActivity(id){
-  if(!confirm("Delete this activity? This cannot be undone in the prototype."))return;
-  D.activities=D.activities.filter(a=>a.id!==id);toast("Activity deleted","success");refreshPage();
+async function deleteActivity(id){
+  if(!confirm("Delete this activity? This cannot be undone."))return;
+  try{
+    await apiRequest("delete",{entity:"activities",id,token:localStorage.getItem(API_SESSION_KEY)});
+    await syncAfterChange();
+    toast("Activity deleted","success");
+  }catch(err){handleApiError(err)}
 }
 
 function openProject(id=""){
@@ -512,12 +693,30 @@ function openProject(id=""){
       <div class="field span-2"><label>Notes</label><textarea id="pfNotes">${escapeHtml(p?.notes||"")}</textarea></div>
     </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${p?"Save Changes":"Add Project"}</button></div></form>`);
 }
-function saveProject(e,id){
+async function saveProject(e,id){
   e.preventDefault();
   const pillars=[...document.querySelectorAll("[data-pillar].selected")].map(x=>x.dataset.pillar);
-  const obj={name:el("pfName").value.trim(),client:el("pfClient").value.trim(),dealStatus:el("pfDeal").value,projectStatus:el("pfStatus").value,startDate:el("pfStart").value,targetEndDate:el("pfEnd").value,url:el("pfUrl").value.trim(),pillars,notes:el("pfNotes").value.trim()};
-  if(id){Object.assign(projectById(id),obj);toast("Project updated","success")}else{D.projects.push({id:uid("p"),...obj,createdBy:currentUser().id});toast("Project added","success")}
-  closeModal();refreshPage();
+  const deal=D.dealStatuses.find(x=>x.name===el("pfDeal").value);
+  const status=D.projectStatuses.find(x=>x.name===el("pfStatus").value);
+  const obj={
+    "Project Name":el("pfName").value.trim(),
+    "Client / Account":el("pfClient").value.trim(),
+    "Project URL":el("pfUrl").value.trim(),
+    "Deal Status ID":deal?.id||"",
+    "Project Status ID":status?.id||"",
+    "Start Date":el("pfStart").value,
+    "Target End Date":el("pfEnd").value,
+    "Notes":el("pfNotes").value.trim(),
+    "Pillars":pillars.join(", ")
+  };
+  if(!obj["Project Name"]||!obj["Client / Account"]){toast("Please complete the required fields.","error");return}
+  try{
+    if(id)await apiRequest("update",{entity:"projects",id,data:obj});
+    else await apiRequest("create",{entity:"projects",data:obj});
+    closeModal();
+    await syncAfterChange();
+    toast(id?"Project updated":"Project added","success");
+  }catch(err){handleApiError(err)}
 }
 
 function deleteProject(id){
@@ -536,17 +735,17 @@ function deleteProject(id){
       <button type="button" class="btn btn-danger" onclick="confirmDeleteProject('${id}')">${icon("trash")} Delete Project</button>
     </div>`);
 }
-function confirmDeleteProject(id){
+async function confirmDeleteProject(id){
   const p=projectById(id);
   if(!p)return;
-  D.activities=D.activities.filter(a=>a.projectId!==id);
-  D.versions=D.versions.filter(v=>v.projectId!==id);
-  D.projects=D.projects.filter(x=>x.id!==id);
-  closeModal();
-  if(S.projectId===id)S.projectId=null;
-  toast(`Project "${p.name}" deleted`,"success");
-  S.page="projects";
-  refreshPage();
+  try{
+    await apiRequest("delete",{entity:"projects",id,token:localStorage.getItem(API_SESSION_KEY)});
+    closeModal();
+    if(S.projectId===id)S.projectId=null;
+    S.page="projects";
+    await syncAfterChange();
+    toast(`Project "${p.name}" deleted`,"success");
+  }catch(err){handleApiError(err)}
 }
 
 function openVersion(id="",projectId=""){
@@ -565,17 +764,36 @@ function openVersion(id="",projectId=""){
       <div class="field span-2"><label>Notes</label><textarea id="vfNotes">${escapeHtml(v?.notes||"")}</textarea></div>
     </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${v?"Save Changes":"Add Version"}</button></div></form>`);
 }
-function saveVersion(e,id){
+async function saveVersion(e,id){
   e.preventDefault();
-  const obj={projectId:el("vfProject").value,number:el("vfNumber").value.trim(),name:el("vfName").value.trim(),reason:el("vfReason").value,status:el("vfStatus").value,date:el("vfDate").value,url:el("vfUrl").value.trim(),notes:el("vfNotes").value.trim()};
-  if(id){Object.assign(versionById(id),obj);toast("Version updated","success")}else{D.versions.push({id:uid("v"),...obj});toast("Version added","success")}
-  closeModal();refreshPage();
+  const status=D.versionStatuses.find(x=>x.name===el("vfStatus").value);
+  const obj={
+    "Project ID":el("vfProject").value,
+    "Version Number":el("vfNumber").value.trim(),
+    "Version Name":el("vfName").value.trim(),
+    "Reason":el("vfReason").value,
+    "Version Status ID":status?.id||"",
+    "Created Date":el("vfDate").value,
+    "Version URL":el("vfUrl").value.trim(),
+    "Notes":el("vfNotes").value.trim()
+  };
+  try{
+    if(id)await apiRequest("update",{entity:"versions",id,data:obj});
+    else await apiRequest("create",{entity:"versions",data:obj});
+    closeModal();
+    await syncAfterChange();
+    toast(id?"Version updated":"Version added","success");
+  }catch(err){handleApiError(err)}
 }
-function deleteVersion(id){
+async function deleteVersion(id){
   const has=D.activities.some(a=>a.versionId===id);
   if(has){toast("This version has activities. Delete or reassign those activities first.","error");return}
   if(!confirm("Delete this version?"))return;
-  D.versions=D.versions.filter(v=>v.id!==id);toast("Version deleted","success");refreshPage();
+  try{
+    await apiRequest("delete",{entity:"versions",id,token:localStorage.getItem(API_SESSION_KEY)});
+    await syncAfterChange();
+    toast("Version deleted","success");
+  }catch(err){handleApiError(err)}
 }
 
 const masterMap={category:"categories",pillar:"pillars",dealStatus:"dealStatuses",projectStatus:"projectStatuses",versionStatus:"versionStatuses"};
@@ -590,18 +808,33 @@ function openMaster(type,id=""){
     </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${item?"Save Changes":"Add Value"}</button></div></form>`);
   const t=el("mfToggle"); t?.addEventListener("click",()=>{const on=t.classList.contains("on");el("mfToggleLabel").textContent=on?"Active":"Inactive";el("mfToggleLabel").className=`toggle-label ${on?"on":""}`});
 }
-function saveMaster(e,type,id){
+async function saveMaster(e,type,id){
   e.preventDefault();
   const arr=D[masterMap[type]], active=el("mfToggle").classList.contains("on");
-  const obj={name:el("mfName").value.trim(),active,order:Number(el("mfOrder").value)||arr.length+1};
-  if(type==="category"||type==="pillar")obj.description=el("mfDesc").value.trim();
-  if(!obj.name){toast("Name is required","error");return}
-  if(id){Object.assign(arr.find(x=>x.id===id),obj);toast("Master value updated","success")}else{arr.push({id:uid(type),...obj});toast("Master value added","success")}
-  closeModal();refreshPage();
+  const name=el("mfName").value.trim();
+  const order=Number(el("mfOrder").value)||arr.length+1;
+  if(!name){toast("Name is required","error");return}
+  const data={"Active":active,"Display Order":order};
+  if(type==="category")data["Category Name"]=name;
+  if(type==="pillar")data["Pillar Name"]=name;
+  if(type==="dealStatus"||type==="projectStatus"||type==="versionStatus")data["Status Name"]=name;
+  if(type==="category"||type==="pillar")data["Description"]=el("mfDesc").value.trim();
+  try{
+    if(id)await apiRequest("updateMaster",{entity:masterBackendEntity[type],id,data});
+    else await apiRequest("createMaster",{entity:masterBackendEntity[type],data});
+    closeModal();
+    await syncAfterChange();
+    toast(id?"Master value updated":"Master value added","success");
+  }catch(err){handleApiError(err)}
 }
-function toggleMaster(type,id){
+async function toggleMaster(type,id){
   const item=D[masterMap[type]].find(x=>x.id===id); if(!item)return;
-  item.active=!item.active;toast(`${item.name} is now ${item.active?"Active":"Inactive"}`,"success");refreshPage();
+  const data={"Active":!item.active};
+  try{
+    await apiRequest("updateMaster",{entity:masterBackendEntity[type],id,data});
+    await syncAfterChange();
+    toast(`${item.name} is now ${!item.active?"Active":"Inactive"}`,"success");
+  }catch(err){handleApiError(err)}
 }
 function masterUsed(type,name){
   if(type==="category")return D.activities.some(a=>a.category===name);
@@ -611,11 +844,15 @@ function masterUsed(type,name){
   if(type==="versionStatus")return D.versions.some(v=>v.status===name);
   return false;
 }
-function deleteMaster(type,id){
+async function deleteMaster(type,id){
   const arr=D[masterMap[type]], item=arr.find(x=>x.id===id); if(!item)return;
   if(masterUsed(type,item.name)){toast("This value is already used by existing records. Deactivate it instead of deleting it.","error");return}
   if(!confirm(`Delete "${item.name}"?`))return;
-  D[masterMap[type]]=arr.filter(x=>x.id!==id);toast("Master value deleted","success");refreshPage();
+  try{
+    await apiRequest("deleteMaster",{entity:masterBackendEntity[type],id,token:localStorage.getItem(API_SESSION_KEY)});
+    await syncAfterChange();
+    toast("Master value deleted","success");
+  }catch(err){handleApiError(err)}
 }
 
 function openUser(id=""){
@@ -639,38 +876,35 @@ function openUser(id=""){
     </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${id?"Save Changes":"Create User"}</button></div></form>`);
   el("ufActive")?.addEventListener("click",()=>{const on=el("ufActive").classList.contains("on");el("ufActiveLabel").textContent=on?"Active":"Inactive";el("ufActiveLabel").className=`toggle-label ${on?"on":""}`});
 }
-function saveUser(e,id){
+async function saveUser(e,id){
   e.preventDefault();
   const email=el("ufEmail").value.trim().toLowerCase();
-  if(D.users.some(u=>u.email.toLowerCase()===email && u.id!==id)){toast("Another user already uses this email.","error");return}
   const password=el("ufPassword").value;
-  const existing=D.users.find(u=>u.id===id);
   if(!id && !password){toast("An initial password is required.","error");return}
-  const obj={
-    name:el("ufName").value.trim(),email,employeeId:el("ufEmp").value.trim(),
-    designation:el("ufDesignation").value.trim(),practice:el("ufPractice").value.trim(),
-    manager:el("ufManager").value.trim(),location:el("ufLocation").value.trim(),
-    joiningDate:el("ufJoining").value,profileUrl:el("ufUrl").value.trim(),bio:el("ufBio").value.trim(),
-    role:el("ufRole").value,active:el("ufActive").classList.contains("on")
+  const data={
+    "Name":el("ufName").value.trim(),
+    "Email":email,
+    "Employee ID":el("ufEmp").value.trim(),
+    "Designation":el("ufDesignation").value.trim(),
+    "Practice / Business Unit":el("ufPractice").value.trim(),
+    "Manager":el("ufManager").value.trim(),
+    "Location":el("ufLocation").value.trim(),
+    "Joining Date":el("ufJoining").value,
+    "Profile URL":el("ufUrl").value.trim(),
+    "Role":el("ufRole").value,
+    "Active":el("ufActive").classList.contains("on"),
+    "Bio":el("ufBio").value.trim()
   };
-  if(password)obj.password=password;
-  if(id){
-    Object.assign(existing,obj);
-    if(existing.id===currentUser().id && !existing.active){
-      localStorage.removeItem(SESSION_KEY);
-      S.authenticated=false;
-      closeModal();render();toast("Your access has been deactivated.","error");return;
-    }
-    if(existing.id===currentUser().id && existing.role!=="Admin"){
-      // Keep current UI permissions aligned after a role change.
-      S.page="dashboard";
-    }
-    toast("User profile updated","success");
-  }else{
-    D.users.push({id:uid("u"),...obj});
-    toast("User created. Share the login details securely with the user.","success");
-  }
-  closeModal();refreshPage();
+  if(password)data.Password=password;
+  try{
+    if(id)await apiRequest("updateUser",{id,data});
+    else await apiRequest("createUser",{data});
+    closeModal();
+    const wasCurrent=id===currentUser().id;
+    await syncAfterChange();
+    if(wasCurrent && !currentUser().active){await logout();return;}
+    toast(id?"User profile updated":"User created. Share the login details securely with the user.","success");
+  }catch(err){handleApiError(err)}
 }
 
 function openModal(title,body){
@@ -705,5 +939,11 @@ function restoreSession(){
   }
 }
 
-restoreSession();
-render();
+(async function init(){
+  el("app").innerHTML=`<div class="login-shell"><div class="login-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Connecting to your secure workspace…</div></div></div>`;
+  const restored=await restoreSession();
+  render();
+  if(!restored && localStorage.getItem(API_SESSION_KEY)){
+    localStorage.removeItem(API_SESSION_KEY);
+  }
+})();
