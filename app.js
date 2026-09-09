@@ -1,125 +1,25 @@
-
-/* Work Activity Tracker V2
-   Frontend prototype only. Data is intentionally in-memory.
-   Authentication below is demo-only and will be replaced by Google Apps Script.
+/* Work Activity Tracker V2.4
+   Supabase-backed, no-login frontend.
+   UI is based on V2.3; persistent data lives in Supabase.
 */
-const uid = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+const SUPABASE_URL = "https://uwmsnhglfxntkubfhfyc.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_RE4qab_OkBeBS71zlXr3Gw_rjuVD82-";
+const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+
 const iso = (d) => new Date(d).toISOString().slice(0,10);
 const today = iso(new Date());
 
 const D = {
-  currentUserId: "u1",
-  users: [
-    {id:"u1",name:"Sai Prashant",email:"sai@example.com",employeeId:"EMP001",designation:"Solution Architect",practice:"Data & AI",manager:"Manager Name",location:"India",joiningDate:"2021-04-12",profileUrl:"",bio:"Work activity tracker administrator.",role:"Admin",active:true,password:"demo123"}
-  ],
-  projects: [
-    {id:"p1",name:"Regions Bank",client:"Regions Bank",url:"https://example.com/regions",dealStatus:"Ongoing",projectStatus:"Active",pillars:["Proposal & RFP Excellence","Sales Enablement & GTM Support"],startDate:"2026-01-05",targetEndDate:"2026-09-30",notes:"Data and AI proposal work.",createdBy:"u1"},
-    {id:"p2",name:"Godrej Capital",client:"Godrej Capital",url:"",dealStatus:"Won",projectStatus:"Active",pillars:["Proposal & RFP Excellence"],startDate:"2026-01-10",targetEndDate:"2026-08-31",notes:"Data platform modernization.",createdBy:"u1"},
-    {id:"p3",name:"Deloitte Data Support",client:"Deloitte",url:"",dealStatus:"Completed",projectStatus:"Completed",pillars:["Sales Enablement & GTM Support"],startDate:"2026-01-15",targetEndDate:"2026-05-31",notes:"Data support engagement.",createdBy:"u1"}
-  ],
-  versions: [
-    {id:"v1",projectId:"p1",number:"V1",name:"Initial Proposal",reason:"New project approach",status:"Baseline",url:"",date:"2026-01-08",notes:"Initial proposal baseline."},
-    {id:"v2",projectId:"p1",number:"V2",name:"Revised Approach",reason:"Client feedback",status:"Submitted",url:"",date:"2026-02-12",notes:"Revised architecture and delivery approach."},
-    {id:"v3",projectId:"p1",number:"V3",name:"Revised / Rejected",reason:"Client rejection",status:"Rejected",url:"",date:"2026-03-10",notes:"Client rejected the previous approach."},
-    {id:"v4",projectId:"p1",number:"V4",name:"Rebuilt Current Version",reason:"Major scope change",status:"In Progress",url:"",date:"2026-04-06",notes:"Rebuilt proposal with Azure Container, Power BI and AI/Agentic AI."},
-    {id:"v5",projectId:"p2",number:"V1",name:"Initial Modernization Proposal",reason:"New project approach",status:"Approved",url:"",date:"2026-01-20",notes:"Initial Godrej proposal."}
-  ],
-  activities: [
-    {id:"a1",projectId:"p1",versionId:"v4",date:"2026-09-08",category:"Architecture",title:"Refined solution architecture",details:"Refined the end-to-end architecture for the current proposal version.",status:"Completed",hours:3.5,url:"",tags:"Architecture, Azure",userId:"u1"},
-    {id:"a2",projectId:"p1",versionId:"v4",date:"2026-09-07",category:"AI / GenAI",title:"Defined AI / GenAI capability",details:"Defined AI and GenAI positioning for the client discussion.",status:"Completed",hours:2,url:"",tags:"AI, GenAI",userId:"u1"},
-    {id:"a3",projectId:"p1",versionId:"v4",date:"2026-09-05",category:"Agentic AI",title:"Defined Agentic AI approach",details:"Outlined the Agentic AI capability and use cases.",status:"Completed",hours:2.5,url:"",tags:"Agentic AI",userId:"u1"},
-    {id:"a4",projectId:"p1",versionId:"v4",date:"2026-09-04",category:"Presentation / Demo",title:"Prepared client presentation",details:"Prepared and refined the client-facing presentation.",status:"Completed",hours:3,url:"",tags:"Presentation",userId:"u1"},
-    {id:"a5",projectId:"p1",versionId:"v2",date:"2026-02-10",category:"Power BI",title:"Separated Power BI capability",details:"Defined Power BI capability as a distinct section of the solution.",status:"Completed",hours:2,url:"",tags:"Power BI",userId:"u1"},
-    {id:"a6",projectId:"p2",versionId:"v5",date:"2026-01-18",category:"Solution Design",title:"Data platform modernization design",details:"Developed the modernization approach.",status:"Completed",hours:4,url:"",tags:"Databricks, Data",userId:"u1"},
-    {id:"a7",projectId:"p3",versionId:"",date:"2026-05-12",category:"Client Delivery",title:"Data support activity",details:"Provided data support for the engagement.",status:"Completed",hours:3,url:"",tags:"Data",userId:"u1"}
-  ],
-  categories: [
-    {id:"c1",name:"Client Delivery",description:"Direct delivery work.",active:true,order:1},
-    {id:"c2",name:"Client Meeting / Discussion",description:"Client meetings and discussions.",active:true,order:2},
-    {id:"c3",name:"Workshop",description:"Workshops and working sessions.",active:true,order:3},
-    {id:"c4",name:"Presentation / Demo",description:"Presentations and demos.",active:true,order:4},
-    {id:"c5",name:"Requirement Analysis",description:"Requirement analysis and discovery.",active:true,order:5},
-    {id:"c6",name:"Solution Design",description:"Solution design work.",active:true,order:6},
-    {id:"c7",name:"Architecture",description:"Architecture and technical design.",active:true,order:7},
-    {id:"c8",name:"Proposal / RFP",description:"Proposal and RFP preparation.",active:true,order:8},
-    {id:"c9",name:"Solutioning",description:"Solutioning and response development.",active:true,order:9},
-    {id:"c10",name:"Estimation / Effort Analysis",description:"Effort and estimation work.",active:true,order:10},
-    {id:"c11",name:"Proposal Review",description:"Review and quality checks.",active:true,order:11},
-    {id:"c12",name:"Sales / GTM Support",description:"Sales and GTM support.",active:true,order:12},
-    {id:"c13",name:"Collateral / Reusable Asset",description:"Reusable collateral.",active:true,order:13},
-    {id:"c14",name:"AI / GenAI",description:"AI and GenAI activities.",active:true,order:14},
-    {id:"c15",name:"Agentic AI",description:"Agentic AI activities.",active:true,order:15},
-    {id:"c16",name:"Data & Analytics",description:"Data and analytics activities.",active:true,order:16},
-    {id:"c17",name:"Architecture / Technology Research",description:"Research and technology assessment.",active:true,order:17},
-    {id:"c18",name:"POC / Prototype",description:"Proofs of concept and prototypes.",active:true,order:18},
-    {id:"c19",name:"Innovation",description:"Innovation initiatives.",active:true,order:19},
-    {id:"c20",name:"Internal Initiative",description:"Internal initiatives.",active:true,order:20},
-    {id:"c21",name:"Knowledge Sharing",description:"Knowledge sharing.",active:true,order:21},
-    {id:"c22",name:"Mentoring / Coaching",description:"Mentoring and coaching.",active:true,order:22},
-    {id:"c23",name:"Team / Practice Contribution",description:"Team and practice contribution.",active:true,order:23},
-    {id:"c24",name:"Process Improvement",description:"Process improvements.",active:true,order:24},
-    {id:"c25",name:"Learning / Training",description:"Learning and training.",active:true,order:25},
-    {id:"c26",name:"Certification",description:"Certification activities.",active:true,order:26},
-    {id:"c27",name:"Skill Development",description:"Skill development.",active:true,order:27},
-    {id:"c28",name:"Documentation",description:"General documentation.",active:true,order:28},
-    {id:"c29",name:"Technical Documentation",description:"Technical documentation.",active:true,order:29},
-    {id:"c30",name:"Reusable Asset Creation",description:"Reusable asset creation.",active:true,order:30}
-  ],
-  pillars: [
-    {id:"pl1",name:"Collateral Development & Reusable Asset Creation",description:"",active:true,order:1},
-    {id:"pl2",name:"Proposal & RFP Excellence",description:"",active:true,order:2},
-    {id:"pl3",name:"Market Intelligence & Trend Analysis",description:"",active:true,order:3},
-    {id:"pl4",name:"Sales Enablement & GTM Support",description:"",active:true,order:4},
-    {id:"pl5",name:"Self Improvement & Skill Enhancement",description:"",active:true,order:5}
-  ],
-  dealStatuses: [
-    {id:"ds1",name:"Won",active:true,order:1},
-    {id:"ds2",name:"Completed",active:true,order:2},
-    {id:"ds3",name:"Lost",active:true,order:3},
-    {id:"ds4",name:"Ongoing",active:true,order:4}
-  ],
-  projectStatuses: [
-    {id:"ps1",name:"Active",active:true,order:1},
-    {id:"ps2",name:"Completed",active:true,order:2},
-    {id:"ps3",name:"On Hold",active:true,order:3},
-    {id:"ps4",name:"Cancelled",active:true,order:4}
-  ],
-  versionStatuses: [
-    {id:"vs1",name:"Baseline",active:true,order:1},
-    {id:"vs2",name:"In Progress",active:true,order:2},
-    {id:"vs3",name:"Submitted",active:true,order:3},
-    {id:"vs4",name:"Under Review",active:true,order:4},
-    {id:"vs5",name:"Approved",active:true,order:5},
-    {id:"vs6",name:"Rejected",active:true,order:6},
-    {id:"vs7",name:"Superseded",active:true,order:7},
-    {id:"vs8",name:"Final",active:true,order:8}
-  ]
-};
-
-
-/* =========================
-   BACKEND API
-   ========================= */
-const API_URL = "https://script.google.com/macros/s/AKfycbyg8D9mD4DjnhbUIq5krJ_0NgODE2QtLpE6FnykmW0f23JcRooAoYCHWQLdH6kWq29c/exec";
-const API_SESSION_KEY = "wat_session_v1";
-
-const backendEntity = {
-  users: "profiles",
-  projects: "projects",
-  versions: "versions",
-  activities: "activities",
-  categories: "activityCategories",
-  pillars: "pillars",
-  dealStatuses: "dealStatuses",
-  projectStatuses: "projectStatuses",
-  versionStatuses: "versionStatuses"
-};
-const masterBackendEntity = {
-  category: "activityCategories",
-  pillar: "pillars",
-  dealStatus: "dealStatuses",
-  projectStatus: "projectStatuses",
-  versionStatus: "versionStatuses"
+  currentUserId: "",
+  users: [],
+  projects: [],
+  versions: [],
+  activities: [],
+  categories: [],
+  pillars: [],
+  dealStatuses: [],
+  projectStatuses: [],
+  versionStatuses: []
 };
 
 function dateOnly(v){
@@ -140,34 +40,132 @@ function splitPillars(v){
   if(!v)return [];
   return String(v).split(/\s*[;,]\s*/).map(x=>x.trim()).filter(Boolean);
 }
-function normalizeProfile(r={}){
-  return {id:String(r["Profile ID"]||""),name:String(r.Name||""),email:String(r.Email||""),employeeId:String(r["Employee ID"]||""),designation:String(r.Designation||""),practice:String(r["Practice / Business Unit"]||""),manager:String(r.Manager||""),location:String(r.Location||""),joiningDate:dateOnly(r["Joining Date"]),profileUrl:String(r["Profile URL"]||""),bio:String(r.Bio||""),role:String(r.Role||"User"),active:boolValue(r.Active)};
-}
-function normalizeCategory(r={}){return {id:String(r["Category ID"]||""),name:String(r["Category Name"]||""),description:String(r.Description||""),active:boolValue(r.Active),order:Number(r["Display Order"]||0)};}
-function normalizePillar(r={}){return {id:String(r["Pillar ID"]||""),name:String(r["Pillar Name"]||""),description:String(r.Description||""),active:boolValue(r.Active),order:Number(r["Display Order"]||0)};}
-function normalizeStatus(r,idField){return {id:String(r[idField]||""),name:String(r["Status Name"]||""),active:boolValue(r.Active),order:Number(r["Display Order"]||0)};}
-function normalizeProject(r={}){return {id:String(r["Project ID"]||""),name:String(r["Project Name"]||""),client:String(r["Client / Account"]||""),url:String(r["Project URL"]||""),dealStatusId:String(r["Deal Status ID"]||""),projectStatusId:String(r["Project Status ID"]||""),dealStatus:"",projectStatus:"",startDate:dateOnly(r["Start Date"]),targetEndDate:dateOnly(r["Target End Date"]),notes:String(r.Notes||""),createdBy:String(r["Created By"]||"") ,pillars:splitPillars(r.Pillars)};}
-function normalizeVersion(r={}){return {id:String(r["Version ID"]||""),projectId:String(r["Project ID"]||""),number:String(r["Version Number"]||""),name:String(r["Version Name"]||""),reason:String(r.Reason||""),statusId:String(r["Version Status ID"]||""),status:"",url:String(r["Version URL"]||""),date:dateOnly(r["Created Date"]),notes:String(r.Notes||"")};}
-function normalizeActivity(r={}){return {id:String(r["Activity ID"]||""),projectId:String(r["Project ID"]||""),versionId:String(r["Version ID"]||""),date:dateOnly(r["Activity Date"]),categoryId:String(r["Category ID"]||""),category:"",title:String(r["Activity Title"]||""),details:String(r["Details / Outcome"]||""),status:String(r["Activity Status"]||""),hours:Number(r.Hours||0),url:String(r.URL||""),tags:String(r.Tags||""),userId:String(r["User ID"]||"")};}
+function normalizeProfile(r={}){return {id:String(r["Profile ID"]||r.id||""),name:String(r.Name||r.name||""),email:String(r.Email||r.email||""),employeeId:String(r["Employee ID"]||r.employee_id||""),designation:String(r.Designation||r.designation||""),practice:String(r["Practice / Business Unit"]||r.practice_business_unit||""),manager:String(r.Manager||r.manager||""),location:String(r.Location||r.location||""),joiningDate:dateOnly(r["Joining Date"]||r.joining_date),profileUrl:String(r["Profile URL"]||r.profile_url||""),bio:String(r.Bio||r.bio||""),role:String(r.Role||r.role||"User"),active:boolValue(r.Active ?? r.active)};}
+function normalizeCategory(r={}){return {id:String(r["Category ID"]||r.id||""),name:String(r["Category Name"]||r.name||""),description:String(r.Description||r.description||""),active:boolValue(r.Active ?? r.active),order:Number(r["Display Order"]??r.display_order??0)};}
+function normalizePillar(r={}){return {id:String(r["Pillar ID"]||r.id||""),name:String(r["Pillar Name"]||r.name||""),description:String(r.Description||r.description||""),active:boolValue(r.Active ?? r.active),order:Number(r["Display Order"]??r.display_order??0)};}
+function normalizeStatus(r,idField){return {id:String(r[idField]||r.id||""),name:String(r["Status Name"]||r.name||""),active:boolValue(r.Active ?? r.active),order:Number(r["Display Order"]??r.display_order??0)};}
+function normalizeProject(r={}){return {id:String(r["Project ID"]||r.id||""),name:String(r["Project Name"]||r.name||""),client:String(r["Client / Account"]||r.client_account||""),url:String(r["Project URL"]||r.project_url||""),dealStatusId:String(r["Deal Status ID"]||r.deal_status_id||""),projectStatusId:String(r["Project Status ID"]||r.project_status_id||""),dealStatus:"",projectStatus:"",startDate:dateOnly(r["Start Date"]||r.start_date),targetEndDate:dateOnly(r["Target End Date"]||r.target_end_date),notes:String(r.Notes||r.notes||""),createdBy:String(r["Created By"]||r.created_by||""),pillars:splitPillars(r.Pillars||r.pillars)};}
+function normalizeVersion(r={}){return {id:String(r["Version ID"]||r.id||""),projectId:String(r["Project ID"]||r.project_id||""),number:String(r["Version Number"]||r.version_number||""),name:String(r["Version Name"]||r.version_name||""),reason:String(r.Reason||r.reason||""),statusId:String(r["Version Status ID"]||r.version_status_id||""),status:"",url:String(r["Version URL"]||r.version_url||""),date:dateOnly(r["Created Date"]||r.created_date),notes:String(r.Notes||r.notes||"")};}
+function normalizeActivity(r={}){return {id:String(r["Activity ID"]||r.id||""),projectId:String(r["Project ID"]||r.project_id||""),versionId:String(r["Version ID"]||r.version_id||""),date:dateOnly(r["Activity Date"]||r.activity_date),categoryId:String(r["Category ID"]||r.category_id||""),category:"",title:String(r["Activity Title"]||r.activity_title||""),details:String(r["Details / Outcome"]||r.details_outcome||""),status:String(r["Activity Status"]||r.activity_status||""),hours:Number(r.Hours??r.hours??0),url:String(r.URL||r.url||""),tags:String(r.Tags||r.tags||""),userId:String(r["User ID"]||r.user_id||"")};}
 
-function apiRequest(action, payload={}){
-  const body={action,...payload};
-  if(action!=="login" && !body.token){
-    const token=localStorage.getItem(API_SESSION_KEY);
-    if(token)body.token=token;
+const tableMap={
+  users:"profiles",projects:"projects",versions:"versions",activities:"activities",
+  categories:"activity_categories",pillars:"pillars",dealStatuses:"deal_statuses",
+  projectStatuses:"project_statuses",versionStatuses:"version_statuses",projectPillars:"project_pillars"
+};
+const masterTableMap={category:"activity_categories",pillar:"pillars",dealStatus:"deal_statuses",projectStatus:"project_statuses",versionStatus:"version_statuses"};
+
+function sbHeaders(extra={}){
+  return {"apikey":SUPABASE_PUBLISHABLE_KEY,"Authorization":`Bearer ${SUPABASE_PUBLISHABLE_KEY}`,"Content-Type":"application/json",...extra};
+}
+async function sbFetch(path,options={}){
+  const response=await fetch(`${SUPABASE_REST_URL}/${path}`,{...options,headers:sbHeaders(options.headers||{})});
+  const text=await response.text();
+  let body=null;
+  if(text){try{body=JSON.parse(text)}catch(_){body=text}}
+  if(!response.ok){
+    const msg=body?.message||body?.hint||body?.details||body?.error||`Supabase request failed (${response.status})`;
+    throw new Error(String(msg));
   }
-  return fetch(API_URL,{
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify(body),
-    redirect:"follow"
-  }).then(async response=>{
-    const text=await response.text();
-    let json;
-    try{json=JSON.parse(text)}catch(_){throw new Error("The backend returned an invalid response.");}
-    if(json.status!=="success")throw new Error(json.message||"Backend request failed.");
-    return json.data;
-  });
+  return body;
+}
+
+function dbToProfile(r){return {"Profile ID":r.id,Name:r.name||"",Email:r.email||"","Employee ID":r.employee_id||"",Designation:r.designation||"","Practice / Business Unit":r.practice_business_unit||"",Manager:r.manager||"",Location:r.location||"","Joining Date":r.joining_date||"","Profile URL":r.profile_url||"",Bio:r.bio||"",Role:r.role||"User",Active:r.active!==false};}
+function dbToCategory(r){return {"Category ID":r.id,"Category Name":r.name||"",Description:r.description||"",Active:r.active!==false,"Display Order":r.display_order||0};}
+function dbToPillar(r){return {"Pillar ID":r.id,"Pillar Name":r.name||"",Description:r.description||"",Active:r.active!==false,"Display Order":r.display_order||0};}
+function dbToStatus(r,idLabel){return {[idLabel]:r.id,"Status Name":r.name||"",Active:r.active!==false,"Display Order":r.display_order||0};}
+function dbToProject(r,pillarNames=[]){return {"Project ID":r.id,"Project Name":r.name||"","Client / Account":r.client_account||"","Project URL":r.project_url||"","Deal Status ID":r.deal_status_id||"","Project Status ID":r.project_status_id||"","Start Date":r.start_date||"","Target End Date":r.target_end_date||"",Notes:r.notes||"","Created By":r.created_by||"",Pillars:pillarNames};}
+function dbToVersion(r){return {"Version ID":r.id,"Project ID":r.project_id,"Version Number":r.version_number||"","Version Name":r.version_name||"",Reason:r.reason||"","Version Status ID":r.version_status_id||"","Version URL":r.version_url||"","Created Date":r.created_date||"",Notes:r.notes||""};}
+function dbToActivity(r){return {"Activity ID":r.id,"Project ID":r.project_id,"Version ID":r.version_id||"","Activity Date":r.activity_date||"","Category ID":r.category_id||"","Activity Title":r.activity_title||"","Details / Outcome":r.details_outcome||"","Activity Status":r.activity_status||"",Hours:r.hours??0,URL:r.url||"",Tags:r.tags||"","User ID":r.user_id||""};}
+
+async function fetchTable(table,query="select=*"){
+  return await sbFetch(`${table}?${query}`) || [];
+}
+async function bootstrapData(){
+  const [profiles,projects,versions,activities,categories,pillars,dealStatuses,projectStatuses,versionStatuses,projectPillars]=await Promise.all([
+    fetchTable(tableMap.users,"select=id,name,email,employee_id,designation,practice_business_unit,manager,location,joining_date,profile_url,bio,role,active&order=name.asc"),
+    fetchTable(tableMap.projects,"select=*&order=name.asc"),
+    fetchTable(tableMap.versions,"select=*&order=created_date.asc"),
+    fetchTable(tableMap.activities,"select=*&order=activity_date.desc"),
+    fetchTable(tableMap.categories,"select=*&order=display_order.asc"),
+    fetchTable(tableMap.pillars,"select=*&order=display_order.asc"),
+    fetchTable(tableMap.dealStatuses,"select=*&order=display_order.asc"),
+    fetchTable(tableMap.projectStatuses,"select=*&order=display_order.asc"),
+    fetchTable(tableMap.versionStatuses,"select=*&order=display_order.asc"),
+    fetchTable(tableMap.projectPillars,"select=project_id,pillar_id")
+  ]);
+  const pillarById=Object.fromEntries(pillars.map(x=>[String(x.id),x.name]));
+  const projectPillarsByProject={};
+  projectPillars.forEach(x=>{(projectPillarsByProject[x.project_id] ||= []); const n=pillarById[String(x.pillar_id)]; if(n) projectPillarsByProject[x.project_id].push(n)});
+  return {
+    profiles:profiles.map(dbToProfile),
+    projects:projects.map(x=>dbToProject(x,projectPillarsByProject[x.id]||[])),
+    versions:versions.map(dbToVersion),activities:activities.map(dbToActivity),
+    activityCategories:categories.map(dbToCategory),pillars:pillars.map(dbToPillar),
+    dealStatuses:dealStatuses.map(x=>dbToStatus(x,"Deal Status ID")),
+    projectStatuses:projectStatuses.map(x=>dbToStatus(x,"Project Status ID")),
+    versionStatuses:versionStatuses.map(x=>dbToStatus(x,"Version Status ID"))
+  };
+}
+
+function projectPayload(data){return {name:data["Project Name"],client_account:data["Client / Account"],project_url:data["Project URL"]||null,deal_status_id:data["Deal Status ID"]||null,project_status_id:data["Project Status ID"]||null,start_date:data["Start Date"]||null,target_end_date:data["Target End Date"]||null,notes:data.Notes||null};}
+function versionPayload(data){return {project_id:data["Project ID"],version_number:data["Version Number"],version_name:data["Version Name"],reason:data.Reason||null,version_status_id:data["Version Status ID"]||null,version_url:data["Version URL"]||null,created_date:data["Created Date"]||null,notes:data.Notes||null};}
+function activityPayload(data){return {project_id:data["Project ID"],version_id:data["Version ID"]||null,activity_date:data["Activity Date"],category_id:data["Category ID"],activity_title:data["Activity Title"],details_outcome:data["Details / Outcome"],activity_status:data["Activity Status"],hours:Number(data.Hours||0),url:data.URL||null,tags:data.Tags||null};}
+function profilePayload(data){return {name:data.Name,email:data.Email,employee_id:data["Employee ID"]||null,designation:data.Designation||null,practice_business_unit:data["Practice / Business Unit"]||null,manager:data.Manager||null,location:data.Location||null,joining_date:data["Joining Date"]||null,profile_url:data["Profile URL"]||null,bio:data.Bio||null,role:data.Role||"User",active:data.Active!==false};}
+
+async function replaceProjectPillars(projectId,pillarNames=[]){
+  await sbFetch(`project_pillars?project_id=eq.${encodeURIComponent(projectId)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}});
+  const ids=pillarNames.map(n=>D.pillars.find(p=>p.name===n)?.id).filter(Boolean);
+  if(ids.length)await sbFetch("project_pillars",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(ids.map(pillar_id=>({project_id:projectId,pillar_id})))});
+}
+
+async function apiRequest(action,payload={}){
+  if(action==="bootstrap")return bootstrapData();
+  if(action==="create"||action==="update"||action==="delete"){
+    const entity=payload.entity, id=payload.id, data=payload.data||{};
+    const table=tableMap[entity]||entity;
+    if(entity==="projects"){
+      if(action==="create"){
+        const rows=await sbFetch("projects",{method:"POST",headers:{"Prefer":"return=representation"},body:JSON.stringify(projectPayload(data))});
+        const row=rows?.[0]; if(!row)throw new Error("Project was not created.");
+        await replaceProjectPillars(row.id,data.Pillars?splitPillars(data.Pillars):[]); return row;
+      }
+      if(action==="update"){
+        const rows=await sbFetch(`projects?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",headers:{"Prefer":"return=representation"},body:JSON.stringify(projectPayload(data))});
+        await replaceProjectPillars(id,data.Pillars?splitPillars(data.Pillars):[]); return rows?.[0]||{};
+      }
+      await sbFetch(`activities?project_id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}});
+      await sbFetch(`versions?project_id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}});
+      await sbFetch(`project_pillars?project_id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}});
+      await sbFetch(`projects?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}}); return {};
+    }
+    if(entity==="versions"||entity==="activities"){
+      const dbData=entity==="versions"?versionPayload(data):activityPayload(data);
+      if(action==="create")return (await sbFetch(table,{method:"POST",headers:{"Prefer":"return=representation"},body:JSON.stringify(dbData)}))?.[0]||{};
+      if(action==="update")return (await sbFetch(`${table}?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",headers:{"Prefer":"return=representation"},body:JSON.stringify(dbData)}))?.[0]||{};
+      await sbFetch(`${table}?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}}); return {};
+    }
+    throw new Error(`Unsupported entity: ${entity}`);
+  }
+  if(action==="createMaster"||action==="updateMaster"||action==="deleteMaster"){
+    const table=masterTableMap[payload.entity]||payload.entity, id=payload.id, data=payload.data||{};
+    const dbData={};
+    if(payload.entity==="activity_categories")dbData.name=data["Category Name"];
+    else if(payload.entity==="pillars")dbData.name=data["Pillar Name"];
+    else dbData.name=data["Status Name"];
+    if(data.Description!==undefined)dbData.description=data.Description||null;
+    if(data.Active!==undefined)dbData.active=data.Active;
+    if(data["Display Order"]!==undefined)dbData.display_order=Number(data["Display Order"]||0);
+    if(action==="createMaster")return (await sbFetch(table,{method:"POST",headers:{"Prefer":"return=representation"},body:JSON.stringify(dbData)}))?.[0]||{};
+    if(action==="updateMaster")return (await sbFetch(`${table}?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",headers:{"Prefer":"return=representation"},body:JSON.stringify(dbData)}))?.[0]||{};
+    await sbFetch(`${table}?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}}); return {};
+  }
+  if(action==="createUser"||action==="updateUser"){
+    const id=payload.id, data=profilePayload(payload.data||{});
+    if(action==="createUser")return (await sbFetch("profiles",{method:"POST",headers:{"Prefer":"return=representation"},body:JSON.stringify(data)}))?.[0]||{};
+    return (await sbFetch(`profiles?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",headers:{"Prefer":"return=representation"},body:JSON.stringify(data)}))?.[0]||{};
+  }
+  throw new Error(`Unsupported request: ${action}`);
 }
 
 function applyBootstrap(data){
@@ -176,81 +174,24 @@ function applyBootstrap(data){
   const dealStatuses=(data.dealStatuses||[]).map(r=>normalizeStatus(r,"Deal Status ID"));
   const projectStatuses=(data.projectStatuses||[]).map(r=>normalizeStatus(r,"Project Status ID"));
   const versionStatuses=(data.versionStatuses||[]).map(r=>normalizeStatus(r,"Version Status ID"));
-  const projects=(data.projects||[]).map(normalizeProject);
-  const versions=(data.versions||[]).map(normalizeVersion);
-  const activities=(data.activities||[]).map(normalizeActivity);
-  const users=(data.profiles||[]).map(normalizeProfile);
-
-  const dealById=Object.fromEntries(dealStatuses.map(x=>[x.id,x.name]));
-  const projectByStatusId=Object.fromEntries(projectStatuses.map(x=>[x.id,x.name]));
-  const versionByStatusId=Object.fromEntries(versionStatuses.map(x=>[x.id,x.name]));
-  const categoryById=Object.fromEntries(categories.map(x=>[x.id,x.name]));
-
+  const projects=(data.projects||[]).map(normalizeProject), versions=(data.versions||[]).map(normalizeVersion), activities=(data.activities||[]).map(normalizeActivity), users=(data.profiles||[]).map(normalizeProfile);
+  const dealById=Object.fromEntries(dealStatuses.map(x=>[x.id,x.name])), projectByStatusId=Object.fromEntries(projectStatuses.map(x=>[x.id,x.name])), versionByStatusId=Object.fromEntries(versionStatuses.map(x=>[x.id,x.name])), categoryById=Object.fromEntries(categories.map(x=>[x.id,x.name]));
   projects.forEach(p=>{p.dealStatus=dealById[p.dealStatusId]||"";p.projectStatus=projectByStatusId[p.projectStatusId]||"";});
-  versions.forEach(v=>{v.status=versionByStatusId[v.statusId]||"";});
-  activities.forEach(a=>{a.category=categoryById[a.categoryId]||"";});
-
-  D.users=users;
-  D.projects=projects;
-  D.versions=versions;
-  D.activities=activities;
-  D.categories=categories;
-  D.pillars=pillars;
-  D.dealStatuses=dealStatuses;
-  D.projectStatuses=projectStatuses;
-  D.versionStatuses=versionStatuses;
-
-  const me=normalizeProfile(data.user||{});
-  if(me.id){
-    D.currentUserId=me.id;
-    const exists=D.users.find(u=>u.id===me.id);
-    if(!exists)D.users.push(me);
-  }
+  versions.forEach(v=>v.status=versionByStatusId[v.statusId]||""); activities.forEach(a=>a.category=categoryById[a.categoryId]||"");
+  D.users=users; D.projects=projects; D.versions=versions; D.activities=activities; D.categories=categories; D.pillars=pillars; D.dealStatuses=dealStatuses; D.projectStatuses=projectStatuses; D.versionStatuses=versionStatuses;
+  if(users[0])D.currentUserId=users[0].id;
 }
 
-async function loadBackendData(){
-  const token=localStorage.getItem(API_SESSION_KEY);
-  if(!token)throw new Error("No active session.");
-  const data=await apiRequest("bootstrap",{token});
-  applyBootstrap(data);
-  S.authenticated=true;
-  return data;
-}
+async function loadBackendData(){const data=await apiRequest("bootstrap");applyBootstrap(data);return data;}
+async function syncAfterChange(){try{await loadBackendData();refreshPage();}catch(err){handleApiError(err);}}
+function handleApiError(err){toast(String(err?.message||err||"Request failed"),"error");}
 
-async function syncAfterChange(){
-  try{
-    await loadBackendData();
-    refreshPage();
-  }catch(err){
-    handleApiError(err);
-  }
-}
+const S = {page:"dashboard",projectId:null,search:"",filters:{project:"",category:"",status:"",from:"",to:""},expandedVersions:{},loading:true};
 
-function handleApiError(err){
-  const msg=String(err?.message||err);
-  if(/session|authentication|invalid|expired|inactive/i.test(msg)){
-    localStorage.removeItem(API_SESSION_KEY);
-    S.authenticated=false;
-    render();
-    toast("Your session has expired. Please sign in again.","error");
-  }else{
-    toast(msg,"error");
-  }
-}
-
-const SESSION_KEY = "wat_session_v1";
-const S = {
-  page:"dashboard",
-  projectId:null,
-  authenticated:false,
-  search:"",
-  filters:{project:"",category:"",status:"",from:"",to:""},
-  expandedVersions:{}
-};
 
 const el = (id) => document.getElementById(id);
-const currentUser = () => D.users.find(u=>u.id===D.currentUserId) || D.users[0];
-const isAdmin = () => currentUser()?.role === "Admin";
+const currentUser = () => D.users.find(u=>u.id===D.currentUserId) || {id:"",name:"Workspace",email:"",designation:"",practice:"",manager:"",location:"",joiningDate:"",profileUrl:"",bio:"",role:"User",active:true};
+const isAdmin = () => true;
 const initials = (name="") => name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
 const escapeHtml = (v="") => String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const projectById = id => D.projects.find(x=>x.id===id);
@@ -300,120 +241,35 @@ function icon(name){
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.dashboard}</svg>`;
 }
 
-function render(){
-  document.title = "Work Activity Tracker";
-  if(!S.authenticated){ renderAuth(); return; }
-  renderApp();
-}
-function renderAuth(){
-  el("app").innerHTML=`
-    <div class="login-shell">
-      <div class="login-card">
-        <div class="login-brand-mark">WAT</div>
-        <div class="login-brand">WORK ACTIVITY TRACKER</div>
-        <div class="login-sub">A structured workspace for projects, versions and work activities.</div>
-        <div class="login-divider"></div>
-        <h1 class="login-title">Sign in</h1>
-        <div class="login-help">Use the credentials provided by your administrator.</div>
-        <form class="login-form" onsubmit="submitAuth(event)">
-          <div class="field"><label>Email</label><input id="authEmail" type="email" autocomplete="username" required placeholder="name@company.com"></div>
-          <div class="field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
-          <button class="btn btn-primary login-submit" type="submit">Sign in <span>→</span></button>
-        </form>
-        <div class="login-security"><span class="security-dot"></span> Access is managed by an administrator.</div>
-      </div>
-    </div>`;
-}
-async function submitAuth(e){
-  e.preventDefault();
-  const email=el("authEmail").value.trim().toLowerCase();
-  const password=el("authPassword").value;
-  const button=e.submitter||document.querySelector(".login-submit");
-  if(button){button.disabled=true;button.textContent="Signing in…";}
-  try{
-    const data=await apiRequest("login",{email,password});
-    localStorage.setItem(API_SESSION_KEY,data.token);
-    D.currentUserId=String(data.user["Profile ID"]||"");
-    S.authenticated=true;
-    S.page="dashboard";
-    await loadBackendData();
-    render();
-    toast("Signed in successfully","success");
-  }catch(err){
-    toast(err.message||"Unable to sign in.","error");
-    if(button){button.disabled=false;button.textContent="Sign in →";}
-  }
-}
-async function restoreSession(){
-  const token=localStorage.getItem(API_SESSION_KEY);
-  if(!token)return false;
-  try{
-    const data=await apiRequest("me",{token});
-    D.currentUserId=String(data.user["Profile ID"]||"");
-    S.authenticated=true;
-    await loadBackendData();
-    return true;
-  }catch(_){
-    localStorage.removeItem(API_SESSION_KEY);
-    S.authenticated=false;
-    return false;
-  }
-}
+function render(){document.title="Work Activity Tracker";renderApp();}
 function renderApp(){
   const u=currentUser();
   el("app").innerHTML=`
     <div class="app-shell">
       <aside class="sidebar" id="sidebar">
-        <div class="brand">
-          <div class="brand-name">WORK ACTIVITY<br>TRACKER</div>
-        </div>
+        <div class="brand"><div class="brand-name">WORK ACTIVITY<br>TRACKER</div></div>
         <nav class="nav">
           ${navBtn("dashboard","Dashboard","dashboard")}
           ${navBtn("activities","Activities","activity")}
           ${navBtn("projects","Projects","projects")}
           ${navBtn("reports","Reports","report")}
-          ${isAdmin()?navBtn("settings","Settings","settings"):""}
+          ${navBtn("settings","Settings","settings")}
           ${navBtn("profile","Profile","profile")}
         </nav>
         <div class="sidebar-bottom">
-          <div class="user-mini">
-            <div class="avatar">${initials(u.name)}</div>
-            <div><div class="user-mini-name">${escapeHtml(u.name)}</div><div class="user-mini-role">${escapeHtml(u.role)}</div></div>
-          </div>
-          <button class="logout-btn" onclick="logout()">${icon("logout")} <span>Sign out</span></button>
+          <div class="user-mini"><div class="avatar">${initials(u.name||"WAT")}</div><div><div class="user-mini-name">${escapeHtml(u.name||"Workspace")}</div><div class="user-mini-role">No login required</div></div></div>
+          <div class="note" style="font-size:10px;padding:8px 9px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#b9c7d9">Connected to Supabase</div>
         </div>
       </aside>
       <main class="main">
-        <header class="topbar">
-          <div class="topbar-actions">
-            <button class="icon-btn mobile-menu" onclick="toggleSidebar()">${icon("menu")}</button>
-            <span class="page-label">Work Activity Tracker</span>
-          </div>
-          <div class="topbar-actions">
-            <button class="btn btn-sm" onclick="go('profile')">${icon("user")} ${escapeHtml(u.name)}</button>
-          </div>
-        </header>
+        <header class="topbar"><div class="topbar-actions"><button class="icon-btn mobile-menu" onclick="toggleSidebar()">${icon("menu")}</button><span class="page-label">Work Activity Tracker</span></div><div class="topbar-actions"><button class="btn btn-sm" onclick="go('profile')">${icon("user")} ${escapeHtml(u.name||"Workspace")}</button></div></header>
         <div class="content">${renderPage()}</div>
       </main>
-    </div>
-    <div id="modalRoot"></div>`;
+    </div><div id="modalRoot"></div>`;
 }
-function navBtn(page,label,ic){
-  return `<button class="nav-btn ${S.page===page?"active":""}" onclick="go('${page}')"><span class="nav-icon">${icon(ic)}</span>${label}</button>`;
-}
-function go(page){
-  S.page=page; S.projectId=null; closeModal(); render(); window.scrollTo(0,0);
-}
+function navBtn(page,label,ic){return `<button class="nav-btn ${S.page===page?"active":""}" onclick="go('${page}')"><span class="nav-icon">${icon(ic)}</span>${label}</button>`;}
+function go(page){S.page=page;S.projectId=null;closeModal();render();window.scrollTo(0,0);}
 function toggleSidebar(){el("sidebar")?.classList.toggle("open")}
-async function logout(){
-  const token=localStorage.getItem(API_SESSION_KEY);
-  try{if(token)await apiRequest("logout",{token});}catch(_){}
-  localStorage.removeItem(API_SESSION_KEY);
-  S.authenticated=false;
-  render();
-  toast("Signed out","success");
-}
-
 function renderPage(){
   switch(S.page){
     case "activities": return pageActivities();
@@ -472,7 +328,7 @@ function activityList(list){
 }
 
 function visibleActivities(){
-  let list=D.activities.filter(a=>a.userId===D.currentUserId || isAdmin());
+  let list=D.activities.slice();
   const f=S.filters;
   if(S.search) {
     const q=S.search.toLowerCase();
@@ -487,7 +343,7 @@ function visibleActivities(){
 }
 function pageActivities(){
   const acts=visibleActivities().sort((a,b)=>b.date.localeCompare(a.date));
-  const projects=D.projects.filter(p=>isAdmin()||p.createdBy===D.currentUserId);
+  const projects=D.projects;
   return `
     ${pageHead("Activities","Record the work you personally performed.",`<button class="btn btn-primary" onclick="openActivity()">${icon("plus")} Add Activity</button>`)}
     <section class="card">
@@ -519,14 +375,14 @@ function statusBadge(s){
 }
 
 function pageProjects(){
-  const projects=D.projects.filter(p=>isAdmin()||p.createdBy===D.currentUserId);
+  const projects=D.projects;
   return `
     ${pageHead("Projects","Manage clients, opportunities and their version history.",`<button class="btn btn-primary" onclick="openProject()">${icon("plus")} Add Project</button>`)}
     <div class="project-grid">${projects.length?projects.map(projectCard).join(""):`<div class="card empty" style="grid-column:1/-1"><div class="empty-title">No projects yet</div><div class="empty-sub">Create your first project.</div></div>`}</div>`;
 }
 function projectCard(p){
   const versions=D.versions.filter(v=>v.projectId===p.id);
-  const acts=D.activities.filter(a=>a.projectId===p.id && (isAdmin()||a.userId===D.currentUserId));
+  const acts=D.activities.filter(a=>a.projectId===p.id);
   return `<div class="card project-card">
     <div class="project-top"><div><div class="project-name">${escapeHtml(p.name)}</div><div class="project-client">${escapeHtml(p.client)}</div></div>${statusBadge(p.projectStatus)}</div>
     <div class="project-pills">${p.pillars.map(x=>`<span class="badge badge-blue">${escapeHtml(x)}</span>`).join("")}</div>
@@ -552,7 +408,7 @@ function pageProjectDetail(){
 }
 function versionCard(v){
   const open=!!S.expandedVersions[v.id];
-  const acts=D.activities.filter(a=>a.versionId===v.id && (isAdmin()||a.userId===D.currentUserId)).sort((a,b)=>b.date.localeCompare(a.date));
+  const acts=D.activities.filter(a=>a.versionId===v.id).sort((a,b)=>b.date.localeCompare(a.date));
   return `<div class="version-card">
     <div class="version-head"><div class="version-main"><div class="version-number">${escapeHtml(v.number)}</div><div><div class="version-name">${escapeHtml(v.name)}</div><div class="version-reason">${escapeHtml(v.reason)}</div></div></div><div class="actions">${statusBadge(v.status)}<button class="icon-btn" onclick="S.expandedVersions['${v.id}']=!S.expandedVersions['${v.id}'];refreshPage()">${icon(open?"back":"arrow")}</button><button class="icon-btn" onclick="openVersion('${v.id}')">${icon("edit")}</button></div></div>
     ${open?`<div class="version-body"><div class="version-meta"><span>Created: <strong>${fmtDate(v.date)}</strong></span><span>Activities: <strong>${acts.length}</strong></span>${v.url?`<span><a href="${escapeHtml(v.url)}" target="_blank">${icon("link")} Version URL</a></span>`:""}</div><div class="actions" style="margin-top:11px"><button class="btn btn-sm btn-primary" onclick="openActivity('', '${v.projectId}', '${v.id}')">${icon("plus")} Add Activity</button><button class="btn btn-sm" onclick="deleteVersion('${v.id}')">${icon("trash")} Delete Version</button></div><div class="version-activities">${activityList(acts)}</div></div>`:""}
@@ -560,7 +416,7 @@ function versionCard(v){
 }
 
 function pageReports(){
-  const acts=D.activities.filter(a=>isAdmin()||a.userId===D.currentUserId).filter(a=>!S.filters.from||a.date>=S.filters.from).filter(a=>!S.filters.to||a.date<=S.filters.to);
+  const acts=D.activities.slice().filter(a=>!S.filters.from||a.date>=S.filters.from).filter(a=>!S.filters.to||a.date<=S.filters.to);
   const hours=acts.reduce((s,a)=>s+Number(a.hours||0),0);
   const byProject={}; const byCat={};
   acts.forEach(a=>{const p=projectById(a.projectId)?.name||"Unknown";byProject[p]=(byProject[p]||0)+1;byCat[a.category]=(byCat[a.category]||0)+1});
@@ -598,23 +454,13 @@ function masterCard(title,list,type,label){
 
 function pageProfile(){
   const u=currentUser();
-  return `
-    ${pageHead("Profile","Manage your profile and, for administrators, the people who can access the application.",isAdmin()?`<button class="btn btn-primary" onclick="openUser()">${icon("plus")} Add User</button>`:"")}
-    <div class="profile-grid">
-      <section class="card profile-card">
-        <div class="profile-header"><div class="profile-avatar">${initials(u.name)}</div><div><div class="profile-name">${escapeHtml(u.name)}</div><div class="profile-role">${escapeHtml(u.designation||"")} · ${escapeHtml(u.role)}</div></div></div>
-        <div class="form-grid">
-          ${profileInfo("Name",u.name)}${profileInfo("Email",u.email)}${profileInfo("Employee ID",u.employeeId)}${profileInfo("Designation",u.designation)}${profileInfo("Practice / Business Unit",u.practice)}${profileInfo("Manager",u.manager)}${profileInfo("Location",u.location)}${profileInfo("Joining Date",u.joiningDate?fmtDate(u.joiningDate):"—")}${profileInfo("Profile URL",u.profileUrl||"—")}${profileInfo("Role",u.role)}<div class="span-2">${profileInfo("Bio",u.bio||"—")}</div>
-        </div>
-        <div class="actions" style="margin-top:18px"><button class="btn btn-primary" onclick="openUser('${u.id}')">${icon("edit")} Edit My Profile</button></div>
-      </section>
-      ${isAdmin()?`
-      <section class="card profile-card">
-        <div class="card-head"><div><h2 class="card-title">User Access</h2><p class="card-sub">Only active profiles can access the application.</p></div><span class="badge badge-blue">${D.users.filter(x=>x.active).length} active</span></div>
-        <div class="user-list">${D.users.map(x=>`
-          <div class="user-row"><div><div class="user-name">${escapeHtml(x.name)}</div><div class="user-email">${escapeHtml(x.email)}</div></div><div>${escapeHtml(x.designation||"—")}</div><div>${statusBadge(x.role)}</div><div>${x.active?statusBadge("Active"):statusBadge("Inactive")}</div><div class="row-actions"><button class="icon-btn" onclick="openUser('${x.id}')">${icon("edit")}</button></div></div>`).join("")}</div>
-      </section>`:""}
-    </div>`;
+  return `${pageHead("Profile","Optional profile information. The tracker does not require login or user authentication.")}
+    <section class="card profile-card">
+      <div class="profile-header"><div class="profile-avatar">${initials(u.name||"Workspace")}</div><div><div class="profile-name">${escapeHtml(u.name||"Workspace")}</div><div class="profile-role">${escapeHtml(u.designation||"Workspace profile")}</div></div></div>
+      <div class="note">No-login mode is enabled. Work records are shared through the Supabase database. A profile is optional and does not control access.</div>
+      <div class="form-grid" style="margin-top:18px">${profileInfo("Name",u.name||"—")}${profileInfo("Email",u.email||"—")}${profileInfo("Employee ID",u.employeeId||"—")}${profileInfo("Designation",u.designation||"—")}${profileInfo("Practice / Business Unit",u.practice||"—")}${profileInfo("Manager",u.manager||"—")}</div>
+      <div class="actions" style="margin-top:18px"><button class="btn btn-primary" onclick="openUser('${u.id||""}')">${icon("edit")} ${u.id?"Edit Profile":"Create Profile"}</button></div>
+    </section>`;
 }
 function profileInfo(label,value){return `<div><div class="info-label">${label}</div><div class="info-value">${escapeHtml(value||"—")}</div></div>`}
 
@@ -626,7 +472,7 @@ function openActivity(id="",projectId="",versionId=""){
     <form id="activityForm" onsubmit="saveActivity(event,'${id}')">
       <div class="form-grid">
         <div class="field"><label>Date</label><input id="afDate" type="date" required value="${a?.date||today}"></div>
-        <div class="field"><label>Project</label><select id="afProject" required onchange="populateActivityVersions()"><option value="">Select project</option>${D.projects.filter(p=>isAdmin()||p.createdBy===D.currentUserId).map(p=>`<option value="${p.id}" ${selectedProject===p.id?"selected":""}>${escapeHtml(p.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Project</label><select id="afProject" required onchange="populateActivityVersions()"><option value="">Select project</option>${D.projects.map(p=>`<option value="${p.id}" ${selectedProject===p.id?"selected":""}>${escapeHtml(p.name)}</option>`).join("")}</select></div>
         <div class="field"><label>Version</label><select id="afVersion"><option value="">No version</option>${D.versions.filter(v=>v.projectId===selectedProject).map(v=>`<option value="${v.id}" ${selectedVersion===v.id?"selected":""}>${escapeHtml(v.number+" · "+v.name)}</option>`).join("")}</select></div>
         <div class="field"><label>Category</label><select id="afCategory" required><option value="">Select category</option>${activeCategories().map(c=>`<option ${a?.category===c.name?"selected":""}>${escapeHtml(c.name)}</option>`).join("")}</select></div>
         <div class="field span-2"><label>Activity Title</label><input id="afTitle" required value="${escapeHtml(a?.title||"")}" placeholder="What did you do?"></div>
@@ -672,7 +518,7 @@ async function saveActivity(e,id){
 async function deleteActivity(id){
   if(!confirm("Delete this activity? This cannot be undone."))return;
   try{
-    await apiRequest("delete",{entity:"activities",id,token:localStorage.getItem(API_SESSION_KEY)});
+    await apiRequest("delete",{entity:"activities",id});
     await syncAfterChange();
     toast("Activity deleted","success");
   }catch(err){handleApiError(err)}
@@ -739,7 +585,7 @@ async function confirmDeleteProject(id){
   const p=projectById(id);
   if(!p)return;
   try{
-    await apiRequest("delete",{entity:"projects",id,token:localStorage.getItem(API_SESSION_KEY)});
+    await apiRequest("delete",{entity:"projects",id});
     closeModal();
     if(S.projectId===id)S.projectId=null;
     S.page="projects";
@@ -754,7 +600,7 @@ function openVersion(id="",projectId=""){
   const nextNumber=v?.number||`V${D.versions.filter(x=>x.projectId===pid).length+1}`;
   openModal(v?"Edit Version":"Add Version",`
     <form onsubmit="saveVersion(event,'${id}')"><div class="form-grid">
-      <div class="field"><label>Project</label><select id="vfProject" required ${v||projectId?"disabled":""}>${D.projects.filter(p=>isAdmin()||p.createdBy===D.currentUserId).map(p=>`<option value="${p.id}" ${pid===p.id?"selected":""}>${escapeHtml(p.name)}</option>`).join("")}</select></div>
+      <div class="field"><label>Project</label><select id="vfProject" required ${v||projectId?"disabled":""}>${D.projects.map(p=>`<option value="${p.id}" ${pid===p.id?"selected":""}>${escapeHtml(p.name)}</option>`).join("")}</select></div>
       <div class="field"><label>Version Number</label><input id="vfNumber" required value="${escapeHtml(nextNumber)}"></div>
       <div class="field span-2"><label>Version Name</label><input id="vfName" required value="${escapeHtml(v?.name||"")}"></div>
       <div class="field"><label>Reason</label><select id="vfReason">${["New project approach","Client feedback","Client rejection","Major scope change","Internal refinement","Final version","Other"].map(x=>`<option ${v?.reason===x?"selected":""}>${x}</option>`).join("")}</select></div>
@@ -790,7 +636,7 @@ async function deleteVersion(id){
   if(has){toast("This version has activities. Delete or reassign those activities first.","error");return}
   if(!confirm("Delete this version?"))return;
   try{
-    await apiRequest("delete",{entity:"versions",id,token:localStorage.getItem(API_SESSION_KEY)});
+    await apiRequest("delete",{entity:"versions",id});
     await syncAfterChange();
     toast("Version deleted","success");
   }catch(err){handleApiError(err)}
@@ -820,8 +666,8 @@ async function saveMaster(e,type,id){
   if(type==="dealStatus"||type==="projectStatus"||type==="versionStatus")data["Status Name"]=name;
   if(type==="category"||type==="pillar")data["Description"]=el("mfDesc").value.trim();
   try{
-    if(id)await apiRequest("updateMaster",{entity:masterBackendEntity[type],id,data});
-    else await apiRequest("createMaster",{entity:masterBackendEntity[type],data});
+    if(id)await apiRequest("updateMaster",{entity:masterTableMap[type],id,data});
+    else await apiRequest("createMaster",{entity:masterTableMap[type],data});
     closeModal();
     await syncAfterChange();
     toast(id?"Master value updated":"Master value added","success");
@@ -831,7 +677,7 @@ async function toggleMaster(type,id){
   const item=D[masterMap[type]].find(x=>x.id===id); if(!item)return;
   const data={"Active":!item.active};
   try{
-    await apiRequest("updateMaster",{entity:masterBackendEntity[type],id,data});
+    await apiRequest("updateMaster",{entity:masterTableMap[type],id,data});
     await syncAfterChange();
     toast(`${item.name} is now ${!item.active?"Active":"Inactive"}`,"success");
   }catch(err){handleApiError(err)}
@@ -849,64 +695,32 @@ async function deleteMaster(type,id){
   if(masterUsed(type,item.name)){toast("This value is already used by existing records. Deactivate it instead of deleting it.","error");return}
   if(!confirm(`Delete "${item.name}"?`))return;
   try{
-    await apiRequest("deleteMaster",{entity:masterBackendEntity[type],id,token:localStorage.getItem(API_SESSION_KEY)});
+    await apiRequest("deleteMaster",{entity:masterTableMap[type],id});
     await syncAfterChange();
     toast("Master value deleted","success");
   }catch(err){handleApiError(err)}
 }
 
 function openUser(id=""){
-  if(!isAdmin() && id!==currentUser().id){toast("Only administrators can manage users.","error");return}
-  const u=D.users.find(x=>x.id===id)||{};
-  openModal(id?"Edit User":"Add User",`
-    <form onsubmit="saveUser(event,'${id}')"><div class="form-grid">
-      <div class="field"><label>Name</label><input id="ufName" required value="${escapeHtml(u.name||"")}"></div>
-      <div class="field"><label>Email</label><input id="ufEmail" type="email" required value="${escapeHtml(u.email||"")}"></div>
-      <div class="field"><label>Employee ID</label><input id="ufEmp" value="${escapeHtml(u.employeeId||"")}"></div>
-      <div class="field"><label>Designation</label><input id="ufDesignation" required value="${escapeHtml(u.designation||"")}"></div>
-      <div class="field"><label>Practice / Business Unit</label><input id="ufPractice" value="${escapeHtml(u.practice||"")}"></div>
-      <div class="field"><label>Manager</label><input id="ufManager" value="${escapeHtml(u.manager||"")}"></div>
-      <div class="field"><label>Location</label><input id="ufLocation" value="${escapeHtml(u.location||"")}"></div>
-      <div class="field"><label>Joining Date</label><input id="ufJoining" type="date" value="${u.joiningDate||""}"></div>
-      <div class="field"><label>Profile URL</label><input id="ufUrl" type="url" value="${escapeHtml(u.profileUrl||"")}" placeholder="https://..."></div>
-      <div class="field"><label>Role</label><select id="ufRole"><option ${u.role==="User"?"selected":""}>User</option><option ${u.role==="Admin"?"selected":""}>Admin</option></select></div>
-      <div class="field"><label>${id?"Password":"Initial Password"}</label><input id="ufPassword" type="password" ${id?"":"required"} value="${escapeHtml(id?"":u.password||"")}" placeholder="${id?"Leave blank to keep current password":"Set a temporary password"}"></div>
-      <div class="field"><label>Access</label><div class="toggle-wrap" style="margin-top:4px"><button type="button" id="ufActive" class="toggle ${u.active!==false?"on":""}" onclick="this.classList.toggle('on')"><span></span></button><span id="ufActiveLabel" class="toggle-label ${u.active!==false?"on":""}">${u.active!==false?"Active":"Inactive"}</span></div></div>
-      <div class="field span-2"><label>Bio</label><textarea id="ufBio">${escapeHtml(u.bio||"")}</textarea></div>
-    </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${id?"Save Changes":"Create User"}</button></div></form>`);
-  el("ufActive")?.addEventListener("click",()=>{const on=el("ufActive").classList.contains("on");el("ufActiveLabel").textContent=on?"Active":"Inactive";el("ufActiveLabel").className=`toggle-label ${on?"on":""}`});
+  const u=D.users.find(x=>x.id===id)||currentUser();
+  openModal(id?"Edit Profile":"Create Profile",`<form onsubmit="saveUser(event,'${id}')"><div class="form-grid">
+    <div class="field"><label>Name</label><input id="ufName" required value="${escapeHtml(u.name||"")}"></div>
+    <div class="field"><label>Email</label><input id="ufEmail" type="email" value="${escapeHtml(u.email||"")}"></div>
+    <div class="field"><label>Employee ID</label><input id="ufEmp" value="${escapeHtml(u.employeeId||"")}"></div>
+    <div class="field"><label>Designation</label><input id="ufDesignation" value="${escapeHtml(u.designation||"")}"></div>
+    <div class="field"><label>Practice / Business Unit</label><input id="ufPractice" value="${escapeHtml(u.practice||"")}"></div>
+    <div class="field"><label>Manager</label><input id="ufManager" value="${escapeHtml(u.manager||"")}"></div>
+    <div class="field"><label>Location</label><input id="ufLocation" value="${escapeHtml(u.location||"")}"></div>
+    <div class="field"><label>Joining Date</label><input id="ufJoining" type="date" value="${u.joiningDate||""}"></div>
+    <div class="field"><label>Profile URL</label><input id="ufUrl" type="url" value="${escapeHtml(u.profileUrl||"")}" placeholder="https://..."></div>
+    <div class="field span-2"><label>Bio</label><textarea id="ufBio">${escapeHtml(u.bio||"")}</textarea></div>
+  </div><div class="modal-foot"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" type="submit">${id?"Save Changes":"Create Profile"}</button></div></form>`);
 }
 async function saveUser(e,id){
   e.preventDefault();
-  const email=el("ufEmail").value.trim().toLowerCase();
-  const password=el("ufPassword").value;
-  if(!id && !password){toast("An initial password is required.","error");return}
-  const data={
-    "Name":el("ufName").value.trim(),
-    "Email":email,
-    "Employee ID":el("ufEmp").value.trim(),
-    "Designation":el("ufDesignation").value.trim(),
-    "Practice / Business Unit":el("ufPractice").value.trim(),
-    "Manager":el("ufManager").value.trim(),
-    "Location":el("ufLocation").value.trim(),
-    "Joining Date":el("ufJoining").value,
-    "Profile URL":el("ufUrl").value.trim(),
-    "Role":el("ufRole").value,
-    "Active":el("ufActive").classList.contains("on"),
-    "Bio":el("ufBio").value.trim()
-  };
-  if(password)data.Password=password;
-  try{
-    if(id)await apiRequest("updateUser",{id,data});
-    else await apiRequest("createUser",{data});
-    closeModal();
-    const wasCurrent=id===currentUser().id;
-    await syncAfterChange();
-    if(wasCurrent && !currentUser().active){await logout();return;}
-    toast(id?"User profile updated":"User created. Share the login details securely with the user.","success");
-  }catch(err){handleApiError(err)}
+  const data={"Name":el("ufName").value.trim(),"Email":el("ufEmail").value.trim().toLowerCase(),"Employee ID":el("ufEmp").value.trim(),"Designation":el("ufDesignation").value.trim(),"Practice / Business Unit":el("ufPractice").value.trim(),"Manager":el("ufManager").value.trim(),"Location":el("ufLocation").value.trim(),"Joining Date":el("ufJoining").value,"Profile URL":el("ufUrl").value.trim(),"Bio":el("ufBio").value.trim(),"Role":"User","Active":true};
+  try{const created=await apiRequest(id?"updateUser":"createUser",id?{id,data}:{data});closeModal();await syncAfterChange();if(created?.id&&!id)D.currentUserId=created.id;toast(id?"Profile updated":"Profile created","success");}catch(err){handleApiError(err)}
 }
-
 function openModal(title,body){
   el("modalRoot").innerHTML=`<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="modal-head"><div><div class="modal-title">${title}</div><div class="modal-sub">Complete the information below.</div></div><button class="icon-btn" onclick="closeModal()">${icon("close")}</button></div><div class="modal-body">${body}</div></div></div>`;
 }
@@ -922,28 +736,13 @@ function exportCsv(){
   a.href=url;a.download="work-activity-report.csv";a.click();URL.revokeObjectURL(url);
 }
 
-function restoreSession(){
-  try{
-    const saved=JSON.parse(localStorage.getItem("wat_session")||"null");
-    if(saved?.signedIn && saved.userId){
-      const u=D.users.find(x=>x.id===saved.userId);
-      if(u && u.active){
-        D.currentUserId=u.id;
-        S.authenticated=true;
-      }else{
-        localStorage.removeItem("wat_session");
-      }
-    }
-  }catch(e){
-    localStorage.removeItem("wat_session");
+async function init(){
+  el("app").innerHTML=`<div class="startup-shell"><div class="startup-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Connecting to Supabase…</div></div></div>`;
+  try{await loadBackendData();S.loading=false;render();}
+  catch(err){
+    S.loading=false;
+    el("app").innerHTML=`<div class="startup-shell"><div class="startup-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Unable to connect to Supabase.</div><div class="note" style="margin-top:16px">${escapeHtml(err.message||String(err))}</div><button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="init()">Retry</button></div></div>`;
   }
 }
+init();
 
-(async function init(){
-  el("app").innerHTML=`<div class="login-shell"><div class="login-card"><div class="login-brand-mark">WAT</div><div class="login-brand">WORK ACTIVITY TRACKER</div><div class="login-sub">Connecting to your secure workspace…</div></div></div>`;
-  const restored=await restoreSession();
-  render();
-  if(!restored && localStorage.getItem(API_SESSION_KEY)){
-    localStorage.removeItem(API_SESSION_KEY);
-  }
-})();

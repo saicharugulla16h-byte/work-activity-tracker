@@ -344,3 +344,7 @@ body{font-size:14px}
 .modal-foot{padding:13px 20px}
 .icon-btn{transition:.15s ease}
 .icon-btn svg{width:15px;height:15px}
+
+/* V2.4 Supabase startup state */
+.startup-shell{min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 20% 20%,#eef5ff 0,#f5f8fc 42%,#edf2f8 100%)}
+.startup-card{width:min(430px,calc(100% - 30px));background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);padding:34px;text-align:left}
